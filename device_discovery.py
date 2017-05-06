@@ -338,4 +338,4 @@ if __name__ == '__main__':
         logger.setLevel(logging.DEBUG)
         ch.setLevel(logging.DEBUG)
     # Do the job
-    exploreDevice(args.hostname, community=args.community)
+    print(exploreDevice(args.hostname, community=args.community))
