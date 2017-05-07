@@ -1,8 +1,10 @@
+#!/usr/bin/python3
+
 from setuptools import setup, find_packages
 
 setup(
     name='netdescribe',
-    version='0.1.0a',
+    version='0.1.0a1',
     description='Scripts for performing discovery on network devices.',
     long_description='Scripts for performing discovery on network devices.',
     url='https://github.com/equill/netdescribe',
@@ -20,6 +22,6 @@ setup(
         'Programming Language :: Python :: 3.5',
     ],
     keywords='network discovery snmp',
-    install_requires=['pysnmp'],
     packages=find_packages(),
+    install_requires=[],
 )

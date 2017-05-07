@@ -21,30 +21,12 @@
 import pysnmp.hlapi
 
 # Included batteries
-import argparse
 import re
-import logging
-import sys
-
-
-# Configure logging
-# Basic setup
-#
-LOGLEVEL=logging.INFO
-logger = logging.getLogger('device_discovery')
-#
-# Create console handler
-# create and configure console handler, and add it to the logger
-ch = logging.StreamHandler(stream=sys.stdout)
-ch.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
-ch.setLevel(LOGLEVEL)
-logger.setLevel(LOGLEVEL)
-logger.addHandler(ch)
 
 
 # Utility functions
 
-def snmpGet(hostname, mib, attr, community, port=161):
+def snmpGet(hostname, mib, attr, community, logger, port=161):
     '''
     Perform an SNMP GET for a single OID or scalar attribute.
     Return only the value.
@@ -75,7 +57,7 @@ def snmpGet(hostname, mib, attr, community, port=161):
     else:
         return varBinds[0][1].prettyPrint()
 
-def snmpBulkGet(hostname, mib, attr, community, port=161):
+def snmpBulkGet(hostname, mib, attr, community, logger, port=161):
     '''
     Perform an SNMP BULKGET on mib::attr.
     Return a 2-level dict:
@@ -139,7 +121,7 @@ def snmpBulkGet(hostname, mib, attr, community, port=161):
 
 # Functions to actually get the data
 
-def identifyHost(hostname, community='public'):
+def identifyHost(hostname, logger, community='public'):
     '''
     Extract some general identifying characteristics.
     Return a dict:
@@ -156,12 +138,12 @@ def identifyHost(hostname, community='public'):
             'sysObjectID',
             'sysServices',
             ]:
-        response=snmpGet(hostname, 'SNMPv2-MIB', attr, community=community)
+        response=snmpGet(hostname, 'SNMPv2-MIB', attr, community, logger)
         if response:
             data[attr]=response
     return data
 
-def getIfStackTable(hostname, community):
+def getIfStackTable(hostname, community, logger):
     '''
     Extract IF-MIB::ifStackTable from a device, per
     http://www.net-snmp.org/docs/mibs/ifMIBObjects.html
@@ -171,7 +153,7 @@ def getIfStackTable(hostname, community):
     logger.debug('Attempting to query %s for ifStackTable', hostname)
     data = {}
     try:
-        rawdata = snmpBulkGet(hostname, 'IF-MIB', 'ifStackTable', community).items()
+        rawdata = snmpBulkGet(hostname, 'IF-MIB', 'ifStackTable', community, logger).items()
         logger.debug('rawdata: %s', rawdata)
         for raw, status in rawdata:
             stackparts=re.split('\.', raw)
@@ -222,7 +204,7 @@ def ifInvStackTableToNest(table, index='0'):
             acc[sub] = ifInvStackTableToNest(table, sub)
         return acc
 
-def getIfaceAddrMap(hostname, community):
+def getIfaceAddrMap(hostname, community, logger):
     '''
     Extract a mapping of addresses to interfaces.
     Return a structure contained in a parent dict:
@@ -232,8 +214,8 @@ def getIfaceAddrMap(hostname, community):
             - netmask
     Tested only on Juniper SRX100 so far.
     '''
-    addrIndex = snmpBulkGet(hostname, 'IP-MIB', 'ipAdEntIfIndex', community)['ipAdEntIfIndex']
-    addrNetmask = snmpBulkGet(hostname, 'IP-MIB', 'ipAdEntNetMask', community)['ipAdEntNetMask']
+    addrIndex = snmpBulkGet(hostname, 'IP-MIB', 'ipAdEntIfIndex', community, logger)['ipAdEntIfIndex']
+    addrNetmask = snmpBulkGet(hostname, 'IP-MIB', 'ipAdEntNetMask', community, logger)['ipAdEntNetMask']
     # SNMP returns this to us by address not interface.
     # Thus, we have to build an address-oriented dict first, then assemble the final result.
     acc = {}
@@ -250,7 +232,7 @@ def getIfaceAddrMap(hostname, community):
         result[details['index']].append({'address': addr, 'netmask': details['netmask']})
     return result
 
-def discoverNetwork(hostname, community):
+def discoverNetwork(hostname, community, logger):
     '''
     Extract the device's network details, and return them as a nested structure:
     - interfaces
@@ -277,7 +259,7 @@ def discoverNetwork(hostname, community):
     '''
     network = {'interfaces': {} }
     # Basic interface details
-    ifTable = snmpBulkGet(hostname, 'IF-MIB', 'ifTable', community)
+    ifTable = snmpBulkGet(hostname, 'IF-MIB', 'ifTable', community, logger)
     for row in [
             'ifDescr',
             'ifType',
@@ -289,7 +271,7 @@ def discoverNetwork(hostname, community):
                 network['interfaces'][index] = {}
             network['interfaces'][index][row] = value
     # Extended interface details
-    ifXTable = snmpBulkGet(hostname, 'IF-MIB', 'ifXTable', community)
+    ifXTable = snmpBulkGet(hostname, 'IF-MIB', 'ifXTable', community, logger)
     for row in [
             'ifName',
             'ifHighSpeed',
@@ -300,16 +282,16 @@ def discoverNetwork(hostname, community):
         for index, value in ifXTable[row].items():
             network['interfaces'][index][row] = value
     # Map addresses to interfaces
-    network['ifIfaceAddrMap'] = getIfaceAddrMap(hostname, community)
+    network['ifIfaceAddrMap'] = getIfaceAddrMap(hostname, community, logger)
     # ifStackTable encodes the relationship between subinterfaces and their parents.
-    stack = getIfStackTable(hostname, community)
+    stack = getIfStackTable(hostname, community, logger)
     if stack:
         network['ifStackTable'] = getInvStackTable(stack)
         network['ifStackTree'] = ifInvStackTableToNest(network['ifStackTable'])
     # Return all the stuff we discovered
     return network
 
-def exploreDevice(hostname, community='public'):
+def exploreDevice(hostname, logger, community='public'):
     '''
     Build up a picture of a device via SNMP queries.
     Return the results as a nest of dicts:
@@ -320,24 +302,8 @@ def exploreDevice(hostname, community='public'):
     # Dict to hold the device's information
     device={}
     # Top-level system information
-    device['sysinfo'] = identifyHost(hostname, community)
+    device['sysinfo'] = identifyHost(hostname, logger, community)
     # Interfaces
-    device['network'] = discoverNetwork(hostname, community)
+    device['network'] = discoverNetwork(hostname, community, logger)
     # Return the information we found
     return device
-
-# Enable this to be run as a CLI script, as well as used as a library.
-# Mostly used for testing, at this stage.
-if __name__ == '__main__':
-    # Get the command-line arguments
-    parser = argparse.ArgumentParser(description='Perform SNMP discovery on a host, returning its data in a single structure.')
-    parser.add_argument('hostname', type=str, help='The hostname or address to perform discovery on')
-    parser.add_argument('--community', type=str, action='store', dest='community', default='public', help='SNMP v2 community string')
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    args=parser.parse_args()
-    # Set debug logging, if requested
-    if args.debug:
-        logger.setLevel(logging.DEBUG)
-        ch.setLevel(logging.DEBUG)
-    # Do the job
-    print(exploreDevice(args.hostname, community=args.community))
