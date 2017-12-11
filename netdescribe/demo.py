@@ -20,7 +20,7 @@ Aggregate discovery manager
 #   limitations under the License.
 
 # Local modules
-from snmp import device_discovery
+from netdescribe.snmp import device_discovery
 
 # Included batteries
 import argparse
