@@ -1,6 +1,8 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
-# Aggregate discovery manager
+"""
+Aggregate discovery manager
+"""
 
 
 #   Copyright [2017] [James Fleming <james@electronic-quill.net]
@@ -17,28 +19,28 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Included batteries
-import sys
-import logging
-import argparse
-
 # Local modules
-import netdescribe.snmp.device_discovery
+from snmp import device_discovery
+
+# Included batteries
+import argparse
+import logging
+import sys
 
 
 # Configure logging
 # Basic setup
 #
-LOGLEVEL=logging.INFO
+LOGLEVEL = logging.INFO
 LOGGER = logging.getLogger('netdescribe')
 #
 # Create console handler
 # create and configure console handler, and add it to the logger
-ch = logging.StreamHandler(stream=sys.stdout)
-ch.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
-ch.setLevel(LOGLEVEL)
+CH = logging.StreamHandler(stream=sys.stdout)
+CH.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
+CH.setLevel(LOGLEVEL)
 LOGGER.setLevel(LOGLEVEL)
-LOGGER.addHandler(ch)
+LOGGER.addHandler(CH)
 
 
 
@@ -46,20 +48,20 @@ LOGGER.addHandler(ch)
 # Mostly used for testing, at this stage.
 if __name__ == '__main__':
     # Get the command-line arguments
-    parser = argparse.ArgumentParser(description='Perform SNMP discovery on a host, returning its data in a single structure.')
-    parser.add_argument('hostname', type=str, help='The hostname or address to perform discovery on')
-    parser.add_argument('--community', type=str, action='store', dest='community', default='public', help='SNMP v2 community string')
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    args=parser.parse_args()
+    PARSER = argparse.ArgumentParser(description='Perform SNMP discovery on a host, \
+    returning its data in a single structure.')
+    PARSER.add_argument('hostname', type=str,
+                        help='The hostname or address to perform discovery on')
+    PARSER.add_argument('--community', type=str, action='store',
+                        dest='community', default='public', help='SNMP v2 community string')
+    PARSER.add_argument('--debug', action='store_true', help='Enable debug logging')
+    ARGS = PARSER.parse_args()
     # Set debug logging, if requested
-    if args.debug:
+    if ARGS.debug:
         LOGGER.setLevel(logging.DEBUG)
-        ch.setLevel(logging.DEBUG)
+        CH.setLevel(logging.DEBUG)
     # Perform SNMP discovery on a device
-    device={
-            'snmp': netdescribe.snmp.device_discovery.exploreDevice(
-                args.hostname,
-                LOGGER,
-                community=args.community,
-                )}
-    print(device)
+    DEVICE = {'snmp': device_discovery.exploreDevice(ARGS.hostname,
+                                                     LOGGER,
+                                                     community=ARGS.community,)}
+    print(DEVICE)
