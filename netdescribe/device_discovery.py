@@ -28,40 +28,48 @@ import logging
 import sys
 
 
-# Configure logging
-# Basic setup
-#
-LOGLEVEL = logging.INFO
-LOGGER = logging.getLogger('netdescribe')
-#
-# Create console handler
-# create and configure console handler, and add it to the logger
-CH = logging.StreamHandler(stream=sys.stdout)
-CH.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
-CH.setLevel(LOGLEVEL)
-LOGGER.setLevel(LOGLEVEL)
-LOGGER.addHandler(CH)
+def create_logger(loglevel=logging.INFO):
+    """
+    Create a logging object, suitable for passing to the discovery functions.
+    """
+    # Creat the basic object, and set its base loglevel
+    logger = logging.getLogger('netdescribe')
+    logger.setLevel(logging.DEBUG)
+    # Create and configure a console handler, and add it to the logger
+    chandler = logging.StreamHandler(stream=sys.stdout)
+    chandler.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
+    chandler.setLevel(loglevel)
+    logger.addHandler(chandler)
+    # Return the logger we created
+    return logger
 
 
-
-# Enable this to be run as a CLI script, as well as used as a library.
-# Mostly used for testing, at this stage.
-if __name__ == '__main__':
+def basic_demo():
+    """
+    Enable this to be run as a CLI script, as well as used as a library.
+    Mostly intended for testing or a basic demo.
+    """
     # Get the command-line arguments
-    PARSER = argparse.ArgumentParser(description='Perform SNMP discovery on a host, \
+    parser = argparse.ArgumentParser(description='Perform SNMP discovery on a host, \
     returning its data in a single structure.')
-    PARSER.add_argument('hostname', type=str,
+    parser.add_argument('hostname',
+                        type=str,
                         help='The hostname or address to perform discovery on')
-    PARSER.add_argument('--community', type=str, action='store',
-                        dest='community', default='public', help='SNMP v2 community string')
-    PARSER.add_argument('--debug', action='store_true', help='Enable debug logging')
-    ARGS = PARSER.parse_args()
+    parser.add_argument('--community',
+                        type=str,
+                        action='store',
+                        dest='community',
+                        default='public',
+                        help='SNMP v2 community string')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    args = parser.parse_args()
     # Set debug logging, if requested
-    if ARGS.debug:
-        LOGGER.setLevel(logging.DEBUG)
-        CH.setLevel(logging.DEBUG)
-    # Perform SNMP discovery on a device
-    DEVICE = {'snmp': device_discovery.exploreDevice(ARGS.hostname,
-                                                     LOGGER,
-                                                     community=ARGS.community,)}
-    print(DEVICE)
+    if args.debug:
+        logger = create_logger(logging.DEBUG)
+    else:
+        logger = create_logger()
+    # Perform SNMP discovery on a device and print the result to STDOUT
+    print(device_discovery.exploreDevice(args.hostname, logger, community=args.community))
+
+if __name__ == '__main__':
+    basic_demo()
