@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-# Perform discovery on an individual host, using SNMP version 2c
-
-
 #   Copyright [2017] [James Fleming <james@electronic-quill.net]
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +13,10 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
+
+"""
+Perform discovery on an individual host, using SNMP version 2c
+"""
 
 # Third-party libraries
 import pysnmp.hlapi
@@ -32,20 +33,18 @@ def snmpGet(hostname, mib, attr, community, logger, port=161):
     Return only the value.
     '''
     # Use pysnmp to retrieve the data
-    (errorIndication,
-     errorStatus,
-     errorIndex,
-     varBinds) = next(pysnmp.hlapi.getCmd(pysnmp.hlapi.SnmpEngine(), # Create the SNMP engine
-                                          # Authentication: set the SNMP version (2c)
-                                          # and community-string
-                                          pysnmp.hlapi.CommunityData(community, mpModel=1),
-                                          # Set the transport and target: UDP, hostname:port
-                                          pysnmp.hlapi.UdpTransportTarget((hostname, port)),
-                                          # Context is a v3 thing, but appears to be required anyway
-                                          pysnmp.hlapi.ContextData(),
-                                          # Specify the MIB object to read.
-                                          # The 0 means we're retrieving a scalar value.
-                                          pysnmp.hlapi.ObjectType(pysnmp.hlapi.ObjectIdentity(mib, attr, 0))))
+    errorIndication, errorStatus, errorIndex, varBinds = next(
+        pysnmp.hlapi.getCmd(pysnmp.hlapi.SnmpEngine(), # Create the SNMP engine
+                            # Authentication: set the SNMP version (2c)
+                            # and community-string
+                            pysnmp.hlapi.CommunityData(community, mpModel=1),
+                            # Set the transport and target: UDP, hostname:port
+                            pysnmp.hlapi.UdpTransportTarget((hostname, port)),
+                            # Context is a v3 thing, but appears to be required anyway
+                            pysnmp.hlapi.ContextData(),
+                            # Specify the MIB object to read.
+                            # The 0 means we're retrieving a scalar value.
+                            pysnmp.hlapi.ObjectType(pysnmp.hlapi.ObjectIdentity(mib, attr, 0))))
     # Handle the responses
     if errorIndication:
         logger.error(errorIndication)
@@ -73,28 +72,27 @@ def snmpBulkGet(hostname, mib, attr, community, logger, port=161):
     maxRepetitions = 10000
     # Use pysnmp to retrieve the data
     data = {} # Accumulator for the results
-    for (errorIndication,
-         errorStatus,
-         errorIndex,
-         varBinds) in pysnmp.hlapi.bulkCmd(pysnmp.hlapi.SnmpEngine(),
-                                           # Create the SNMP engine
-                                           # Authentication: set the SNMP version (2c)
-                                           # and community-string
-                                           pysnmp.hlapi.CommunityData(community, mpModel=1),
-                                           # Set the transport and target: UDP, hostname:port
-                                           pysnmp.hlapi.UdpTransportTarget((hostname, port)),
-                                           # Context is a v3 thing, but is required anyway
-                                           pysnmp.hlapi.ContextData(),
-                                           # Specify operational limits
-                                           nonRepeaters,
-                                           maxRepetitions,
-                                           # Specify the MIB object to read.
-                                           pysnmp.hlapi.ObjectType(pysnmp.hlapi.ObjectIdentity(mib, attr)),
-                                           # Stop when we get results outside the scope we
-                                           # requested, instead of carrying on until the agent runs
-                                           # out of OIDs to send back.
-                                           lexicographicMode=False,
-                                           lookupMib=False):
+    g = pysnmp.hlapi.bulkCmd(pysnmp.hlapi.SnmpEngine(),
+                             # Create the SNMP engine
+                             # Authentication: set the SNMP version (2c)
+                             # and community-string
+                             pysnmp.hlapi.CommunityData(community, mpModel=1),
+                             # Set the transport and target: UDP, hostname:port
+                             pysnmp.hlapi.UdpTransportTarget((hostname, port)),
+                             # Context is a v3 thing, but is required anyway
+                             pysnmp.hlapi.ContextData(),
+                             ## Specify operational limits
+                             nonRepeaters,
+                             maxRepetitions,
+                             # Specify the MIB object to read.
+                             pysnmp.hlapi.ObjectType(pysnmp.hlapi.ObjectIdentity(mib, attr)),
+                             # Stop when we get results outside the scope we
+                             # requested, instead of carrying on until the agent runs
+                             # out of OIDs to send back.
+                             lexicographicMode=False,
+                             # Convert
+                             lookupMib=True)
+    for errorIndication, errorStatus, errorIndex, varBinds in g:
         # Handle the responses
         if errorIndication:
             logger.error(errorIndication)
@@ -107,7 +105,8 @@ def snmpBulkGet(hostname, mib, attr, community, logger, port=161):
         else:
             for varBind in varBinds:
                 # Extract the index values.
-                # We're breaking down 'IF-MIB::ifType.530' into (row='ifType', index='530')
+                # We're breaking down 'IF-MIB::ifType.530' into (row='ifType', index='530').
+                # This relies on 'lookupMib=True', to translate numeric OIDs into textual ones.
                 keys = re.split('\.', re.split('::', varBind[0].prettyPrint())[1], maxsplit=1)
                 row = keys[0]
                 index = keys[1]
@@ -128,10 +127,11 @@ def identifyHost(hostname, logger, community='public'):
     '''
     Extract some general identifying characteristics.
     Return a dict:
-    - sysName      # Hostname. Should be the FDQN, but don't count on it.
-    - sysDescr     # Detailed text description of the system.
-    - sysObjectID  # Vendor's OID identifying the device.
-    - sysServices  # Network-layer services offered by this device. Uses weird maths, but may be usable.
+    - sysName       # Hostname. Should be the FDQN, but don't count on it.
+    - sysDescr      # Detailed text description of the system.
+    - sysObjectID   # Vendor's OID identifying the device.
+    - sysServices   # Network-layer services offered by this device.
+                    # Uses weird maths, but may be usable.
     '''
     logger.debug('Querying %s for general details', hostname)
     data = {}
