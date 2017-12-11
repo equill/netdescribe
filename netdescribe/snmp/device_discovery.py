@@ -22,7 +22,13 @@ Perform discovery on an individual host, using SNMP version 2c
 import pysnmp.hlapi
 
 # Included batteries
+from collections import namedtuple
 import re
+
+
+# Data structures
+SnmpDatum = namedtuple('snmpDatum', ['oid', 'value'])
+IpAddress = namedtuple('ipAddress', ['address', 'netmask'])
 
 
 # Utility functions
@@ -53,16 +59,16 @@ def snmpGet(hostname, mib, attr, community, logger, port=161):
         logger.error('%s at %s' % (errorStatus.prettyPrint(),
                                    errorIndex and varBinds[int(errorIndex) - 1][0] or '?'))
         return False
-    # If we actually got something, return it in human-readable form
+    # If we actually got something, return it as an SnmpDatum
     else:
         return varBinds[0][1].prettyPrint()
 
 def snmpBulkGet(hostname, mib, attr, community, logger, port=161):
     '''
     Perform an SNMP BULKGET on mib::attr.
-    Return a 2-level dict:
+    Return a dict:
     - rowname
-        - index = value
+        - list of SnmpDatum namedTuples
     This structure mirrors SNMP's representation of tables as rows with indexed values.
     '''
     logger.debug('Querying %s for %s::%s', hostname, mib, attr)
@@ -111,19 +117,19 @@ def snmpBulkGet(hostname, mib, attr, community, logger, port=161):
                 row = keys[0]
                 index = keys[1]
                 # Now get the value
-                value = varBind[1].prettyPrint()
+                val = varBind[1].prettyPrint()
                 # Update the results table, ensuring the row is actually present
-                logger.debug('%s.%s = %s', row, index, value)
+                logger.debug('%s.%s = %s', row, index, val)
                 if row not in data:
-                    data[row] = {}
-                data[row][index] = value
+                    data[row] = []
+                data[row].append(SnmpDatum(oid=index, value=val))
     # Return what we found
     return data
 
 
 # Functions to actually get the data
 
-def identifyHost(hostname, logger, community='public'):
+def identify_host(hostname, logger, community='public'):
     '''
     Extract some general identifying characteristics.
     Return a dict:
@@ -153,16 +159,17 @@ def getIfStackTable(hostname, community, logger):
     '''
     logger.debug('Attempting to query %s for ifStackTable', hostname)
     data = {}
-    try:
-        rawdata = snmpBulkGet(hostname, 'IF-MIB', 'ifStackTable', community, logger).items()
-        logger.debug('rawdata: %s', rawdata)
-        for raw, status in rawdata:
-            stackparts = re.split('\.', raw)
-            data[stackparts[0]] = stackparts[1]
-        logger.debug('ifStackTable: %s', data)
-        return data
-    except:
-        return False
+    rawdata = snmpBulkGet(hostname, 'IF-MIB', 'ifStackTable', community, logger)
+    logger.debug('rawdata: %s', rawdata)
+    for datum in rawdata['ifStackStatus']:
+        logger.debug("Entry: %s" % datum.oid)
+        stackparts = re.split('\.', datum.oid)
+        upper = stackparts[0]
+        lower = stackparts[1]
+        logger.debug("Upper: %s. Lower: %s." % (upper, lower))
+        data[upper] = lower
+    logger.debug('ifStackTable: %s', data)
+    return data
 
 def getInvStackTable(stack):
     '''
@@ -205,14 +212,12 @@ def ifInvStackTableToNest(table, index='0'):
             acc[sub] = ifInvStackTableToNest(table, sub)
         return acc
 
-def getIfaceAddrMap(hostname, community, logger):
+def get_iface_addr_map(hostname, community, logger):
     '''
     Extract a mapping of addresses to interfaces.
     Return a structure contained in a parent dict:
     - interface index (for reconciling with other interface data)
-        - list of address dicts
-            - address
-            - netmask
+        - list of IpAddress namedtuples
     Tested only on Juniper SRX100 so far.
     '''
     addrIndex = snmpBulkGet(hostname,
@@ -227,21 +232,39 @@ def getIfaceAddrMap(hostname, community, logger):
                               logger)['ipAdEntNetMask']
     # SNMP returns this to us by address not interface.
     # Thus, we have to build an address-oriented dict first, then assemble the final result.
-    acc = {}
+    acc = {}    # Intermediate accumulator for building up a map
     # Addresses
-    for addr, index in addrIndex.items():
-        acc[addr] = {'index': index}
+    for item in addrIndex.items():
+        acc[item.name] = {'index': item.value}
     # Netmasks
-    for addr, mask in addrNetmask.items():
-        acc[addr]['netmask'] = mask
+    for item in addrNetmask.items():
+        acc[item.name]['netmask'] = item.value
+    # Build the return structure
     result = {}
     for addr, details in acc.items():
+        # Ensure there's an entry for this interface
         if details['index'] not in result:
             result[details['index']] = []
-        result[details['index']].append({'address': addr, 'netmask': details['netmask']})
+        result[details['index']].append(IpAddress(address=addr, netmask=details['netmask']))
+    # Return it
     return result
 
-def discoverNetwork(hostname, community, logger):
+def iface_addr_map_to_dicts(imap):
+    '''
+    Convert the output of get_iface_addr_map() to a nest of dicts,
+    for returning by discover_network().
+    Return structure is as follows:
+    - interface index (relative to ifTable)
+        - list of dicts:
+            - address = IP address for interface
+            - netmask = netmask for interface address
+    '''
+    result = {}
+    for iface, addrlist in imap.items():
+        result[iface] = [{'address': addr.address, 'netmask': addr.netmask} for addr in addrlist]
+    return result
+
+def discover_host_networking(hostname, community, logger):
     '''
     Extract the device's network details, and return them as a nested structure:
     - interfaces
@@ -261,7 +284,10 @@ def discoverNetwork(hostname, community, logger):
     - ifStackTable      # Contents of the ifStackTable SNMP table for the device if it was returned.
                         # False if nothing was returned.
     - ifIfaceAddrMap      # Mapping of addresses to interface indices
-        - output of getIfaceAddrMap()
+        - interface index (relative to ifTable)
+            - list of dicts:
+                - address = IP address for interface
+                - netmask = netmask for interface address
     # The following entries will only be present if ifStackTable is not False:
     - ifStackTree       # Mapping of parent interfaces to subinterfaces
         - output of stackToDict()
@@ -273,10 +299,10 @@ def discoverNetwork(hostname, community, logger):
                 'ifType',
                 'ifSpeed',
                 'ifPhysAddress', ]:
-        for index, value in ifTable[row].items():
-            if index not in network['interfaces']:
-                network['interfaces'][index] = {}
-            network['interfaces'][index][row] = value
+        for item in ifTable[row].items():
+            if item.oid not in network['interfaces']:
+                network['interfaces'][item.oid] = {}
+            network['interfaces'][item.oid][row] = item.value
     # Extended interface details
     ifXTable = snmpBulkGet(hostname, 'IF-MIB', 'ifXTable', community, logger)
     for row in ['ifName',
@@ -284,10 +310,11 @@ def discoverNetwork(hostname, community, logger):
                 'ifAlias']:
         # We should be able to assume that the index is already there by now.
         # If it isn't, we really do have a problem.
-        for index, value in ifXTable[row].items():
-            network['interfaces'][index][row] = value
+        for item in ifXTable[row].items():
+            network['interfaces'][item.oid][row] = item.value
     # Map addresses to interfaces
-    network['ifIfaceAddrMap'] = getIfaceAddrMap(hostname, community, logger)
+    network['ifIfaceAddrMap'] = iface_addr_map_to_dicts(
+        get_iface_addr_map(hostname, community, logger))
     # ifStackTable encodes the relationship between subinterfaces and their parents.
     stack = getIfStackTable(hostname, community, logger)
     if stack:
@@ -300,15 +327,15 @@ def exploreDevice(hostname, logger, community='public'):
     '''
     Build up a picture of a device via SNMP queries.
     Return the results as a nest of dicts:
-    - sysinfo: output of identifyHost()
-    - network: output of discoverNetwork()
+    - sysinfo: output of identify_host()
+    - network: output of discover_host_networking()
     '''
     logger.info('Performing discovery on %s', hostname)
     # Dict to hold the device's information
     device = {}
     # Top-level system information
-    device['sysinfo'] = identifyHost(hostname, logger, community)
+    device['sysinfo'] = identify_host(hostname, logger, community)
     # Interfaces
-    device['network'] = discoverNetwork(hostname, community, logger)
+    device['network'] = discover_host_networking(hostname, community, logger)
     # Return the information we found
     return device
