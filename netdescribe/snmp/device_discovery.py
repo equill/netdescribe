@@ -281,16 +281,15 @@ def discover_host_networking(hostname, community, logger):
                             # in units of 1,000,000 bits per second. Zero for subinterfaces
                             # with no concept of bandwidth.
             - ifPhysAddress    # E.g. MAC address for an 802.x interface
-    - ifStackTable      # Contents of the ifStackTable SNMP table for the device if it was returned.
-                        # False if nothing was returned.
     - ifIfaceAddrMap      # Mapping of addresses to interface indices
         - interface index (relative to ifTable)
             - list of dicts:
                 - address = IP address for interface
                 - netmask = netmask for interface address
-    # The following entries will only be present if ifStackTable is not False:
-    - ifStackTree       # Mapping of parent interfaces to subinterfaces
-        - output of stackToDict()
+    # The following entries will be None if ifStackTable is not implemented on the target device.
+    # They're explicitly set this way to make it simpler for client code to test for them.
+    - ifStackTable      # Contents of the ifStackTable SNMP table
+    - ifStackTree       # Mapping of parent interfaces to subinterfaces from StackToDict()
     '''
     network = {'interfaces': {}}
     # Basic interface details
@@ -298,7 +297,7 @@ def discover_host_networking(hostname, community, logger):
     for row in ['ifDescr',
                 'ifType',
                 'ifSpeed',
-                'ifPhysAddress', ]:
+                'ifPhysAddress']:
         for item in ifTable[row].items():
             if item.oid not in network['interfaces']:
                 network['interfaces'][item.oid] = {}
@@ -308,8 +307,6 @@ def discover_host_networking(hostname, community, logger):
     for row in ['ifName',
                 'ifHighSpeed',
                 'ifAlias']:
-        # We should be able to assume that the index is already there by now.
-        # If it isn't, we really do have a problem.
         for item in ifXTable[row].items():
             network['interfaces'][item.oid][row] = item.value
     # Map addresses to interfaces
@@ -320,6 +317,9 @@ def discover_host_networking(hostname, community, logger):
     if stack:
         network['ifStackTable'] = getInvStackTable(stack)
         network['ifStackTree'] = ifInvStackTableToNest(network['ifStackTable'])
+    else:
+        network['ifStackTable'] = None
+        network['ifStackTree'] = None
     # Return all the stuff we discovered
     return network
 
