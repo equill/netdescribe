@@ -69,7 +69,7 @@ def basic_demo():
     else:
         logger = create_logger()
     # Perform SNMP discovery on a device and print the result to STDOUT
-    print(device_discovery.exploreDevice(args.hostname, logger, community=args.community))
+    print(device_discovery.explore_device(args.hostname, logger, community=args.community))
 
 if __name__ == '__main__':
     basic_demo()
