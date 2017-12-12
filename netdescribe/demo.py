@@ -22,26 +22,12 @@ Aggregate discovery manager
 # Local modules
 from netdescribe.snmp import device_discovery
 
+# From this package
+from netdescribe.utils import create_logger
+
 # Included batteries
 import argparse
 import logging
-import sys
-
-
-def create_logger(loglevel=logging.INFO):
-    """
-    Create a logging object, suitable for passing to the discovery functions.
-    """
-    # Creat the basic object, and set its base loglevel
-    logger = logging.getLogger('netdescribe')
-    logger.setLevel(logging.DEBUG)
-    # Create and configure a console handler, and add it to the logger
-    chandler = logging.StreamHandler(stream=sys.stdout)
-    chandler.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
-    chandler.setLevel(loglevel)
-    logger.addHandler(chandler)
-    # Return the logger we created
-    return logger
 
 
 def basic_demo():

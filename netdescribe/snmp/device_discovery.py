@@ -21,6 +21,9 @@ Perform discovery on an individual host, using SNMP version 2c
 # Third-party libraries
 import pysnmp.hlapi
 
+# From this package
+from netdescribe.utils import create_logger
+
 # Included batteries
 from collections import namedtuple
 import re
@@ -129,7 +132,7 @@ def snmp_bulk_get(hostname, mib, attr, community, logger, port=161):
 
 # Functions to actually get the data
 
-def identify_host(hostname, logger, community='public'):
+def identify_host(hostname, community, logger):
     '''
     Extract some general identifying characteristics.
     Return a dict:
@@ -323,18 +326,22 @@ def discover_host_networking(hostname, community, logger):
     # Return all the stuff we discovered
     return network
 
-def explore_device(hostname, logger, community='public'):
+def explore_device(hostname, logger=None, community='public'):
     '''
     Build up a picture of a device via SNMP queries.
     Return the results as a nest of dicts:
     - sysinfo: output of identify_host()
     - network: output of discover_host_networking()
     '''
-    logger.info('Performing discovery on %s', hostname)
+    # Ensure we have a logger
+    if not logger:
+        create_logger()
     # Dict to hold the device's information
     device = {}
+    # Now get to work
+    logger.info('Performing discovery on %s', hostname)
     # Top-level system information
-    device['sysinfo'] = identify_host(hostname, logger, community)
+    device['sysinfo'] = identify_host(hostname, community, logger)
     # Interfaces
     device['network'] = discover_host_networking(hostname, community, logger)
     # Return the information we found
