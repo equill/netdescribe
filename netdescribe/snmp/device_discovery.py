@@ -55,16 +55,16 @@ def snmp_get(hostname, mib, attr, community, logger, port=161):
                             # The 0 means we're retrieving a scalar value.
                             pysnmp.hlapi.ObjectType(pysnmp.hlapi.ObjectIdentity(mib, attr, 0))))
     # Handle the responses
+    returnval = False
     if error_indication:
         logger.error(error_indication)
-        return False
     elif error_status:
         logger.error('%s at %s' % (error_status.prettyPrint(),
                                    error_index and var_binds[int(error_index) - 1][0] or '?'))
-        return False
     # If we actually got something, return it as an SnmpDatum
     else:
-        return var_binds[0][1].prettyPrint()
+        returnval = var_binds[0][1].prettyPrint()
+    return returnval
 
 def snmp_bulk_get(hostname, mib, attr, community, logger, port=161):
     '''
@@ -195,26 +195,6 @@ def get_inv_stack_table(stack):
     # Start at subinterface '0', because that's how SNMP identifies "no interface here."
     return data
 
-def if_inv_stack_table_to_nest(table, index='0'):
-    '''
-    Take a table as output by the first section of get_inv_stack_table().
-    Return a recursively nested dict:
-    - key = SNMP index of an interface
-    - value = False if this interface has no subinterfaces.
-              If it _does_ have subinterfaces, a dict whose keys are their indices
-    '''
-    # If the value for this index is 0, this interface has no subinterfaces.
-    # Return False to indicate this.
-    if table[index] == '0':
-        return False
-    # Otherwise, there are subinterfaces to enumerate.
-    # Recurse through this function.
-    else:
-        acc = {}
-        for sub in table[index]:
-            acc[sub] = if_inv_stack_table_to_nest(table, sub)
-        return acc
-
 def get_iface_addr_map(hostname, community, logger):
     '''
     Extract a mapping of addresses to interfaces.
@@ -237,11 +217,11 @@ def get_iface_addr_map(hostname, community, logger):
     # Thus, we have to build an address-oriented dict first, then assemble the final result.
     acc = {}    # Intermediate accumulator for building up a map
     # Addresses
-    for item in addr_index.items():
-        acc[item.name] = {'index': item.value}
+    for item in addr_index:
+        acc[item.oid] = {'index': item.value}
     # Netmasks
-    for item in addr_netmask.items():
-        acc[item.name]['netmask'] = item.value
+    for item in addr_netmask:
+        acc[item.oid]['netmask'] = item.value
     # Build the return structure
     result = {}
     for addr, details in acc.items():
@@ -292,7 +272,6 @@ def discover_host_networking(hostname, community, logger):
     # The following entries will be None if ifStackTable is not implemented on the target device.
     # They're explicitly set this way to make it simpler for client code to test for them.
     - ifStackTable      # Contents of the ifStackTable SNMP table
-    - ifStackTree       # Mapping of parent interfaces to subinterfaces from StackToDict()
     '''
     network = {'interfaces': {}}
     # Basic interface details
@@ -301,7 +280,7 @@ def discover_host_networking(hostname, community, logger):
                 'ifType',
                 'ifSpeed',
                 'ifPhysAddress']:
-        for item in if_table[row].items():
+        for item in if_table[row]:
             if item.oid not in network['interfaces']:
                 network['interfaces'][item.oid] = {}
             network['interfaces'][item.oid][row] = item.value
@@ -310,7 +289,7 @@ def discover_host_networking(hostname, community, logger):
     for row in ['ifName',
                 'ifHighSpeed',
                 'ifAlias']:
-        for item in ifxtable[row].items():
+        for item in ifxtable[row]:
             network['interfaces'][item.oid][row] = item.value
     # Map addresses to interfaces
     network['ifIfaceAddrMap'] = iface_addr_map_to_dicts(
@@ -319,10 +298,8 @@ def discover_host_networking(hostname, community, logger):
     stack = get_if_stack_table(hostname, community, logger)
     if stack:
         network['ifStackTable'] = get_inv_stack_table(stack)
-        network['ifStackTree'] = if_inv_stack_table_to_nest(network['ifStackTable'])
     else:
         network['ifStackTable'] = None
-        network['ifStackTree'] = None
     # Return all the stuff we discovered
     return network
 
