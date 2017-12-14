@@ -63,7 +63,7 @@ def basic_demo():
     # Suppress INFO output if we're returning it to STDOUT:
     # don't require the user to filter the output to make it useful.
     else:
-        logger = create_logger(loglevel="warn")
+        logger = create_logger(loglevel="warning")
     # Perform SNMP discovery on a device,
     # sending the result to STDOUT or a file, depending on what the user told us.
     if args.filepath:
