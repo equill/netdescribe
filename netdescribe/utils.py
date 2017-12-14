@@ -4,10 +4,6 @@
 General utilities
 """
 
-# Included batteries
-import logging
-import sys
-
 #   Copyright [2017] [James Fleming <james@electronic-quill.net]
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,18 +18,35 @@ import sys
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+# Included batteries
+import logging
+import sys
 
-def create_logger(loglevel=logging.INFO):
+
+def create_logger(loglevel="info"):
     """
     Create a logging object, suitable for passing to the discovery functions.
+    'loglevel" should be a string, with a value selected from
+    - critical
+    - error
+    - warning
+    - info
+    - debug
     """
+    loglevels = {
+        "critical": logging.CRITICAL,
+        "error": logging.ERROR,
+        "warning": logging.WARNING,
+        "info": logging.INFO,
+        "debug": logging.DEBUG,
+    }
     # Creat the basic object, and set its base loglevel
     logger = logging.getLogger('netdescribe')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(loglevels[loglevel])
     # Create and configure a console handler, and add it to the logger
     chandler = logging.StreamHandler(stream=sys.stdout)
     chandler.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
-    chandler.setLevel(loglevel)
+    chandler.setLevel(loglevels[loglevel])
     logger.addHandler(chandler)
     # Return the logger we created
     return logger

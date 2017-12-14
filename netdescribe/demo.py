@@ -19,15 +19,13 @@ Aggregate discovery manager
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Local modules
-from netdescribe.snmp import device_discovery
-
 # From this package
+import netdescribe.files
+import netdescribe.stdout
 from netdescribe.utils import create_logger
 
 # Included batteries
 import argparse
-import logging
 
 
 def basic_demo():
@@ -47,15 +45,31 @@ def basic_demo():
                         dest='community',
                         default='public',
                         help='SNMP v2 community string')
+    parser.add_argument('--file',
+                        type=str,
+                        action='store',
+                        dest='filepath',
+                        default=None,
+                        help='Filepath to write the results to. If this is not specified, \
+                        STDOUT will be used.')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = parser.parse_args()
     # Set debug logging, if requested
     if args.debug:
-        logger = create_logger(logging.DEBUG)
-    else:
+        logger = create_logger(loglevel="debug")
+    # Normal logging if we're writing to a file
+    elif args.filepath:
         logger = create_logger()
-    # Perform SNMP discovery on a device and print the result to STDOUT
-    print(device_discovery.explore_device(args.hostname, logger, community=args.community))
+    # Suppress INFO output if we're returning it to STDOUT:
+    # don't require the user to filter the output to make it useful.
+    else:
+        logger = create_logger(loglevel="warn")
+    # Perform SNMP discovery on a device,
+    # sending the result to STDOUT or a file, depending on what the user told us.
+    if args.filepath:
+        netdescribe.files.snmp_to_json(args.hostname, args.community, args.filepath, logger)
+    else:
+        netdescribe.stdout.snmp_to_json(args.hostname, args.community, logger)
 
 if __name__ == '__main__':
     basic_demo()
