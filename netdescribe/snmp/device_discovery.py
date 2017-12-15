@@ -161,17 +161,20 @@ def get_if_stack_table(hostname, community, logger):
     the value is the lower.
     '''
     logger.debug('Attempting to query %s for ifStackTable', hostname)
-    data = {}
     rawdata = snmp_bulk_get(hostname, 'IF-MIB', 'ifStackTable', community, logger)
     logger.debug('rawdata: %s', rawdata)
-    for datum in rawdata['ifStackStatus']:
-        logger.debug("Entry: %s" % datum.oid)
-        stackparts = re.split('\.', datum.oid)
-        upper = stackparts[0]
-        lower = stackparts[1]
-        logger.debug("Upper: %s. Lower: %s." % (upper, lower))
-        data[upper] = lower
-    logger.debug('ifStackTable: %s', data)
+    if rawdata:
+        data = {}
+        for datum in rawdata['ifStackStatus']:
+            logger.debug("Entry: %s" % datum.oid)
+            stackparts = re.split('\.', datum.oid)
+            upper = stackparts[0]
+            lower = stackparts[1]
+            logger.debug("Upper: %s. Lower: %s." % (upper, lower))
+            data[upper] = lower
+        logger.debug('ifStackTable: %s', data)
+    else:
+        data = None
     return data
 
 def get_inv_stack_table(stack):
