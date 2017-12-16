@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 """
-Aggregate discovery manager
+Example usage of the Netdescribe library.
+Performs discovery, and sends JSON-formatted output to either standard out or a file,
+depending on whether the --file parameter is supplied.
 """
 
 
