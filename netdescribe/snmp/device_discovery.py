@@ -27,6 +27,7 @@ from netdescribe.utils import create_logger
 # Included batteries
 from collections import namedtuple
 import re
+import sys
 
 
 # Data structures
@@ -151,6 +152,9 @@ def identify_host(hostname, community, logger):
         response = snmp_get(hostname, 'SNMPv2-MIB', attr, community, logger)
         if response:
             data[attr] = response
+        else:
+            logger.critical('Failing to retrieve even basic data about %s' % hostname)
+            return None
     return data
 
 def get_if_stack_table(hostname, community, logger):
@@ -206,16 +210,29 @@ def get_iface_addr_map(hostname, community, logger):
         - list of IpAddress namedtuples
     Tested only on Juniper SRX100 so far.
     '''
-    addr_index = snmp_bulk_get(hostname,
-                               'IP-MIB',
-                               'ipAdEntIfIndex',
-                               community,
-                               logger)['ipAdEntIfIndex']
-    addr_netmask = snmp_bulk_get(hostname,
-                                 'IP-MIB',
-                                 'ipAdEntNetMask',
-                                 community,
-                                 logger)['ipAdEntNetMask']
+    logger.debug('Extracting a mapping of addresses to interfaces')
+    # Get the indices
+    index_response = snmp_bulk_get(hostname,
+                                   'IP-MIB',
+                                   'ipAdEntIfIndex',
+                                   community,
+                                   logger)
+    if index_response:
+        addr_index = index_response['ipAdEntIfIndex']
+    else:
+        logger.error('Failed to retrieve address-mapping indices')
+        return None
+    # Now try to get the netmasks
+    netmask_response = snmp_bulk_get(hostname,
+                                     'IP-MIB',
+                                     'ipAdEntNetMask',
+                                     community,
+                                     logger)
+    if netmask_response:
+        addr_netmask = netmask_response['ipAdEntNetMask']
+    else:
+        logger.error('Failed to retrieve interface netmasks')
+        return None
     # SNMP returns this to us by address not interface.
     # Thus, we have to build an address-oriented dict first, then assemble the final result.
     acc = {}    # Intermediate accumulator for building up a map
@@ -246,8 +263,10 @@ def iface_addr_map_to_dicts(imap):
             - netmask = netmask for interface address
     '''
     result = {}
-    for iface, addrlist in imap.items():
-        result[iface] = [{'address': addr.address, 'netmask': addr.netmask} for addr in addrlist]
+    if imap:
+        for iface, addrlist in imap.items():
+            result[iface] = [{'address': addr.address, 'netmask': addr.netmask} for
+                             addr in addrlist]
     return result
 
 def discover_host_networking(hostname, community, logger):
@@ -279,21 +298,23 @@ def discover_host_networking(hostname, community, logger):
     network = {'interfaces': {}}
     # Basic interface details
     if_table = snmp_bulk_get(hostname, 'IF-MIB', 'ifTable', community, logger)
-    for row in ['ifDescr',
-                'ifType',
-                'ifSpeed',
-                'ifPhysAddress']:
-        for item in if_table[row]:
-            if item.oid not in network['interfaces']:
-                network['interfaces'][item.oid] = {}
-            network['interfaces'][item.oid][row] = item.value
+    if if_table:
+        for row in ['ifDescr',
+                    'ifType',
+                    'ifSpeed',
+                    'ifPhysAddress']:
+            for item in if_table[row]:
+                if item.oid not in network['interfaces']:
+                    network['interfaces'][item.oid] = {}
+                network['interfaces'][item.oid][row] = item.value
     # Extended interface details
     ifxtable = snmp_bulk_get(hostname, 'IF-MIB', 'ifXTable', community, logger)
-    for row in ['ifName',
-                'ifHighSpeed',
-                'ifAlias']:
-        for item in ifxtable[row]:
-            network['interfaces'][item.oid][row] = item.value
+    if ifxtable:
+        for row in ['ifName',
+                    'ifHighSpeed',
+                    'ifAlias']:
+            for item in ifxtable[row]:
+                network['interfaces'][item.oid][row] = item.value
     # Map addresses to interfaces
     network['ifIfaceAddrMap'] = iface_addr_map_to_dicts(
         get_iface_addr_map(hostname, community, logger))
@@ -321,7 +342,12 @@ def explore_device(hostname, logger=None, community='public'):
     # Now get to work
     logger.info('Performing discovery on %s', hostname)
     # Top-level system information
-    device['sysinfo'] = identify_host(hostname, community, logger)
+    sysinfo = identify_host(hostname, community, logger)
+    if sysinfo:
+        device['sysinfo'] = sysinfo
+    else:
+        logger.critical('Failed to gather even basic system information about %s', hostname)
+        sys.exit(1)
     # Interfaces
     device['network'] = discover_host_networking(hostname, community, logger)
     # Return the information we found

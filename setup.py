@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='netdescribe',
-    version='0.1.1',
+    version='0.1.2',
     description='Scripts for performing discovery on network devices.',
     long_description='Scripts for performing discovery on network devices.',
     url='https://github.com/equill/netdescribe',
