@@ -2,7 +2,7 @@ NetDescribe
 ============
 
 A set of scripts for performing discovery against devices, and returning the results in a predictable data structure.
-This can then be used for populating a network management system, such as [Syscat](https://github.com/equill/syscat).
+This can then be used for populating a network management system.
 
 Currently supports SNMP only, though Netconf/OpenConfig support are intended for the future. Frankly, the important thing here is getting management/topology data from devices; if `ssh` and `expect` are the only practical ways of getting it from a particular model, pull-requests will be considered.
 
@@ -156,10 +156,6 @@ def basic_demo():
 if __name__ == '__main__':
     basic_demo()
 ```
-
-### Populating Syscat
-
-See [syscat_scripts](https://github.com/equill/syscat_scripts).
 
 
 # Compatibility
