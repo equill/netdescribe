@@ -35,11 +35,9 @@ RESULT = netdescribe.snmp.device_discovery.exploreDevice(
 
 ```
 - sysinfo
-    - sysName       # Hostname. Should be the FDQN, but don't count on it.
+    - sysName       # Usually either the hostname or the host's FQDN.
     - sysDescr      # Detailed text description of the system.
     - sysObjectID   # Vendor's OID identifying the device.
-    - sysServices   # Network-layer services offered by this device.
-                    # Uses weird maths, but may be usable.
 - network
     - interfaces
         - <SNMP index>
@@ -57,12 +55,10 @@ RESULT = netdescribe.snmp.device_discovery.exploreDevice(
             - ifPhysAddress    # E.g. MAC address for an 802.x interface
     - ifIfaceAddrMap      # Mapping of addresses to interface indices
         - interface index (relative to ifTable)
-            - list of dicts:
-                - address = IP address for interface
-                - netmask = netmask for interface address
-    # The following entries will be None if ifStackTable is not implemented on the target device.
-    # They're explicitly set this way to make it simpler for client code to test for them.
-    - ifStackTable      # Contents of the ifStackTable SNMP table
+            - list of ipaddress objects, of type IPv4Interface or IPv6Interface
+    - ifStackTable      # Contents of the ifStackTable SNMP table.
+                        # Returned as None if ifStackTable is not implemented on the target,
+                        # e.g. on Linux.
 ```
 
 

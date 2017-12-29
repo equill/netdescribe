@@ -26,35 +26,30 @@ from netdescribe.utils import create_logger
 
 # Included batteries
 from collections import namedtuple
+import ipaddress
+import json
 import re
 import sys
 
 
 # Data structures
 SnmpDatum = namedtuple('snmpDatum', ['oid', 'value'])
-IpAddress = namedtuple('ipAddress', ['address', 'netmask'])
 
 
 # Utility functions
 
-def snmp_get(hostname, mib, attr, community, logger, port=161):
+#def snmp_get(hostname, mib, attr, community, logger, port=161):
+def snmp_get(engine, auth, target, mib, attr, logger):
     '''
     Perform an SNMP GET for a single OID or scalar attribute.
     Return only the value.
     '''
+    logger.debug('Getting %s::%s from %s', mib, attr, target.transportAddr[0])
     # Use pysnmp to retrieve the data
-    error_indication, error_status, error_index, var_binds = next(
-        pysnmp.hlapi.getCmd(pysnmp.hlapi.SnmpEngine(), # Create the SNMP engine
-                            # Authentication: set the SNMP version (2c)
-                            # and community-string
-                            pysnmp.hlapi.CommunityData(community, mpModel=1),
-                            # Set the transport and target: UDP, hostname:port
-                            pysnmp.hlapi.UdpTransportTarget((hostname, port)),
-                            # Context is a v3 thing, but appears to be required anyway
-                            pysnmp.hlapi.ContextData(),
-                            # Specify the MIB object to read.
-                            # The 0 means we're retrieving a scalar value.
-                            pysnmp.hlapi.ObjectType(pysnmp.hlapi.ObjectIdentity(mib, attr, 0))))
+    obj = pysnmp.hlapi.ObjectIdentity(mib, attr, 0)
+    oid = pysnmp.hlapi.ObjectType(obj)
+    cmd = pysnmp.hlapi.getCmd(engine, auth, target, pysnmp.hlapi.ContextData(), oid)
+    error_indication, error_status, error_index, var_binds = next(cmd)
     # Handle the responses
     returnval = False
     if error_indication:
@@ -67,89 +62,64 @@ def snmp_get(hostname, mib, attr, community, logger, port=161):
         returnval = var_binds[0][1].prettyPrint()
     return returnval
 
-def snmp_bulk_get(hostname, mib, attr, community, logger, port=161):
+def snmp_walk(engine, auth, target, mib, attr, logger):
     '''
-    Perform an SNMP BULKGET on mib::attr.
-    Return a dict:
-    - rowname
-        - list of SnmpDatum namedTuples
-    This structure mirrors SNMP's representation of tables as rows with indexed values.
+    Walk an SNMP OID.
+    Return a list of SnmpDatum namedtuples.
     '''
-    logger.debug('Querying %s for %s::%s', hostname, mib, attr)
-    # Number of nonrepeating MIB variables in the request
-    non_repeaters = 0
-    # Maximum number of variables requested for each of the remaining MIB variables in the request
-    max_repetitions = 10000
-    # Use pysnmp to retrieve the data
-    data = {} # Accumulator for the results
-    engine = pysnmp.hlapi.bulkCmd(pysnmp.hlapi.SnmpEngine(),
-                                  # Create the SNMP engine
-                                  # Authentication: set the SNMP version (2c)
-                                  # and community-string
-                                  pysnmp.hlapi.CommunityData(community, mpModel=1),
-                                  # Set the transport and target: UDP, hostname:port
-                                  pysnmp.hlapi.UdpTransportTarget((hostname, port)),
-                                  # Context is a v3 thing, but is required anyway
-                                  pysnmp.hlapi.ContextData(),
-                                  ## Specify operational limits
-                                  non_repeaters,
-                                  max_repetitions,
-                                  # Specify the MIB object to read.
-                                  pysnmp.hlapi.ObjectType(pysnmp.hlapi.ObjectIdentity(mib, attr)),
-                                  # Stop when we get results outside the scope we
-                                  # requested, instead of carrying on until the agent runs
-                                  # out of OIDs to send back.
-                                  lexicographicMode=False,
-                                  # Convert
-                                  lookupMib=True)
-    for error_indication, error_status, error_index, var_binds in engine:
+    logger.debug('Walking %s::%s on %s', mib, attr, target.transportAddr[0])
+    # Build and execute the command
+    obj = pysnmp.hlapi.ObjectIdentity(mib, attr)
+    oid = pysnmp.hlapi.ObjectType(obj)
+    cmd = pysnmp.hlapi.nextCmd(engine,
+                               auth,
+                               target,
+                               pysnmp.hlapi.ContextData(),
+                               oid,
+                               lexicographicMode=False)
+    returnval = []
+    for (error_indication, error_status, error_index, var_binds) in cmd:
         # Handle the responses
         if error_indication:
             logger.error(error_indication)
-            return False
         elif error_status:
-            logger.error('%s at %s' % (error_status.prettyPrint(),
-                                       error_index and var_binds[int(error_index) - 1][0] or '?'))
-            return False
-        # If we actually got something, return it in human-readable form
+            logger.error('%s at %s',
+                         error_status.prettyPrint(),
+                         error_index and var_binds[int(error_index) - 1][0] or '?')
+        # If we actually got something, return it as an SnmpDatum
         else:
-            for var_bind in var_binds:
+            for var in var_binds:
                 # Extract the index values.
                 # We're breaking down 'IF-MIB::ifType.530' into (row='ifType', index='530').
                 # This relies on 'lookupMib=True', to translate numeric OIDs into textual ones.
-                keys = re.split('\.', re.split('::', var_bind[0].prettyPrint())[1], maxsplit=1)
-                row = keys[0]
+                keys = re.split('\.', re.split('::', var[0].prettyPrint())[1], maxsplit=1)
+                #row = keys[0]
                 index = keys[1]
                 # Now get the value
-                val = var_bind[1].prettyPrint()
-                # Update the results table, ensuring the row is actually present
-                logger.debug('%s.%s = %s', row, index, val)
-                if row not in data:
-                    data[row] = []
-                data[row].append(SnmpDatum(oid=index, value=val))
-    # Return what we found
-    return data
+                val = var[1].prettyPrint()
+                # Update the results table
+                logger.debug('%s = %s', index, val)
+                returnval.append(SnmpDatum(oid=index, value=val))
+    return returnval
 
 
 # Functions to actually get the data
 
-def identify_host(hostname, community, logger):
+def identify_host(engine, auth, target, logger):
     '''
     Extract some general identifying characteristics.
     Return a dict:
     - sysName       # Hostname. Should be the FDQN, but don't count on it.
     - sysDescr      # Detailed text description of the system.
     - sysObjectID   # Vendor's OID identifying the device.
-    - sysServices   # Network-layer services offered by this device.
-                    # Uses weird maths, but may be usable.
     '''
+    hostname = target.transportAddr[0]
     logger.debug('Querying %s for general details', hostname)
     data = {}
     for attr in ['sysName',
                  'sysDescr',
-                 'sysObjectID',
-                 'sysServices',]:
-        response = snmp_get(hostname, 'SNMPv2-MIB', attr, community, logger)
+                 'sysObjectID']:
+        response = snmp_get(engine, auth, target, 'SNMPv2-MIB', attr, logger)
         if response:
             data[attr] = response
         else:
@@ -157,25 +127,21 @@ def identify_host(hostname, community, logger):
             return None
     return data
 
-def get_if_stack_table(hostname, community, logger):
+def get_if_stack_table(engine, auth, target, logger):
     '''
     Extract IF-MIB::ifStackTable from a device, per
     http://www.net-snmp.org/docs/mibs/ifMIBObjects.html
     and return it as a dict, where the key is the higher layer, and
     the value is the lower.
     '''
-    logger.debug('Attempting to query %s for ifStackTable', hostname)
-    rawdata = snmp_bulk_get(hostname, 'IF-MIB', 'ifStackTable', community, logger)
+    logger.debug('Attempting to query %s for ifStackTable', target.transportAddr[0])
+    rawdata = snmp_walk(engine, auth, target, 'IF-MIB', 'ifStackStatus', logger)
     logger.debug('rawdata: %s', rawdata)
     if rawdata:
         data = {}
-        for datum in rawdata['ifStackStatus']:
-            logger.debug("Entry: %s" % datum.oid)
-            stackparts = re.split('\.', datum.oid)
-            upper = stackparts[0]
-            lower = stackparts[1]
-            logger.debug("Upper: %s. Lower: %s." % (upper, lower))
-            data[upper] = lower
+        for datum in rawdata:
+            logger.debug("Upper: %s. Lower: %s." % (datum.oid, datum.value))
+            data[datum.oid] = datum.value
         logger.debug('ifStackTable: %s', data)
     else:
         data = None
@@ -202,74 +168,68 @@ def get_inv_stack_table(stack):
     # Start at subinterface '0', because that's how SNMP identifies "no interface here."
     return data
 
-def get_iface_addr_map(hostname, community, logger):
+def get_iface_addr_map(engine, auth, target, logger):
     '''
     Extract a mapping of addresses to interfaces.
-    Return a structure contained in a parent dict:
-    - interface index (for reconciling with other interface data)
-        - list of IpAddress namedtuples
-    Tested only on Juniper SRX100 so far.
+    Return a dict:
+    - interface index in ifTable
+        - list of ipaddress interface objects
     '''
     logger.debug('Extracting a mapping of addresses to interfaces')
-    # Get the indices
-    index_response = snmp_bulk_get(hostname,
-                                   'IP-MIB',
-                                   'ipAdEntIfIndex',
-                                   community,
-                                   logger)
-    if index_response:
-        addr_index = index_response['ipAdEntIfIndex']
-    else:
-        logger.error('Failed to retrieve address-mapping indices')
-        return None
-    # Now try to get the netmasks
-    netmask_response = snmp_bulk_get(hostname,
-                                     'IP-MIB',
-                                     'ipAdEntNetMask',
-                                     community,
-                                     logger)
-    if netmask_response:
-        addr_netmask = netmask_response['ipAdEntNetMask']
-    else:
-        logger.error('Failed to retrieve interface netmasks')
-        return None
     # SNMP returns this to us by address not interface.
     # Thus, we have to build an address-oriented dict first, then assemble the final result.
     acc = {}    # Intermediate accumulator for building up a map
+    # acc structure:
+    # - index = SNMP index for ipAddressTable, e.g. ipv4."192.168.124.1"
+    #   - index = SNMP index
+    #   - address = IP address
+    #   - protocol = IP protocol version, i.e. ipv4 or ipv6
+    #   - prefixlength = integer, 0-32
+    #   - type = address type: unicast, multicast or broadcast
     # Addresses
-    for item in addr_index:
-        acc[item.oid] = {'index': item.value}
-    # Netmasks
-    for item in addr_netmask:
-        acc[item.oid]['netmask'] = item.value
+    logger.debug('Indices and addresses')
+    for item in snmp_walk(engine, auth, target, 'IP-MIB', 'ipAddressIfIndex', logger):
+        protocol = item.oid[:4]
+        acc[item.oid] = {'index': item.value,
+                         'address': item.oid[6:][0:-1],
+                         'protocol': protocol}
+        logger.debug('Initialising address in the accumulator with %s', acc[item.oid])
+    logger.debug('Prefix lengths')
+    for item in snmp_walk(engine, auth, target, 'IP-MIB', 'ipAddressPrefix', logger):
+        prefixlength = re.split('\.', item.value)[-1]
+        acc[item.oid]['prefixlength'] = prefixlength
+        logger.debug('Added prefixlength %s to the accumulator for address %s',
+                     prefixlength, item.oid)
+    # Types
+    logger.debug('Address types')
+    for item in snmp_walk(engine, auth, target, 'IP-MIB', 'ipAddressType', logger):
+        acc[item.oid]['type'] = item.value
+        logger.debug('Added type %s to the accumulator for address %s', item.value, item.oid)
     # Build the return structure
     result = {}
     for addr, details in acc.items():
-        # Ensure there's an entry for this interface
+        logger.debug('Examining address %s for the address map, with details %s', addr, details)
+        # Is this the kind of address we want?
+        if details['type'] != 'unicast':
+            logger.debug('Rejecting non-unicast address %s with type %s',
+                         addr, details['type'])
+        # Build the interface object
+        # Which IP version?
+        if details['protocol'] == 'ipv4':
+            address = ipaddress.IPv4Interface('%s/%s' % (details['address'],
+                                                         details['prefixlength']))
+        else:
+            address = ipaddress.IPv6Interface('%s/%s' % (details['address'],
+                                                         details['prefixlength']))
+        logger.debug('Inferred address %s', address)
         if details['index'] not in result:
             result[details['index']] = []
-        result[details['index']].append(IpAddress(address=addr, netmask=details['netmask']))
+        result[details['index']].append(address)
     # Return it
+    logger.debug('Returning interface address map: %s', result)
     return result
 
-def iface_addr_map_to_dicts(imap):
-    '''
-    Convert the output of get_iface_addr_map() to a nest of dicts,
-    for returning by discover_network().
-    Return structure is as follows:
-    - interface index (relative to ifTable)
-        - list of dicts:
-            - address = IP address for interface
-            - netmask = netmask for interface address
-    '''
-    result = {}
-    if imap:
-        for iface, addrlist in imap.items():
-            result[iface] = [{'address': addr.address, 'netmask': addr.netmask} for
-                             addr in addrlist]
-    return result
-
-def discover_host_networking(hostname, community, logger):
+def discover_host_networking(engine, auth, target, logger):
     '''
     Extract the device's network details, and return them as a nested structure:
     - interfaces
@@ -295,31 +255,28 @@ def discover_host_networking(hostname, community, logger):
     # They're explicitly set this way to make it simpler for client code to test for them.
     - ifStackTable      # Contents of the ifStackTable SNMP table
     '''
+    logger.info('Discovering network details for host %s', target.transportAddr[0])
     network = {'interfaces': {}}
     # Basic interface details
-    if_table = snmp_bulk_get(hostname, 'IF-MIB', 'ifTable', community, logger)
-    if if_table:
-        for row in ['ifDescr',
-                    'ifType',
-                    'ifSpeed',
-                    'ifPhysAddress']:
-            for item in if_table[row]:
-                if item.oid not in network['interfaces']:
-                    network['interfaces'][item.oid] = {}
-                network['interfaces'][item.oid][row] = item.value
-    # Extended interface details
-    ifxtable = snmp_bulk_get(hostname, 'IF-MIB', 'ifXTable', community, logger)
-    if ifxtable:
-        for row in ['ifName',
-                    'ifHighSpeed',
-                    'ifAlias']:
-            for item in ifxtable[row]:
-                network['interfaces'][item.oid][row] = item.value
+    for row in ['ifDescr', # ifTable OIDs
+                'ifType',
+                'ifSpeed',
+                'ifPhysAddress',
+                # ifXTable OIDs
+                'ifName',
+                'ifHighSpeed',
+                'ifAlias']:
+        for item in snmp_walk(engine, auth, target, 'IF-MIB', row, logger):
+            if item.oid not in network['interfaces']:
+                network['interfaces'][item.oid] = {}
+            network['interfaces'][item.oid][row] = item.value
+    logger.debug('Interfaces discovered:\n%s',
+                 json.dumps(network['interfaces'], indent=4, sort_keys=True))
     # Map addresses to interfaces
-    network['ifIfaceAddrMap'] = iface_addr_map_to_dicts(
-        get_iface_addr_map(hostname, community, logger))
+    logger.debug('Mapping addresses to interfaces')
+    network['ifIfaceAddrMap'] = get_iface_addr_map(engine, auth, target, logger)
     # ifStackTable encodes the relationship between subinterfaces and their parents.
-    stack = get_if_stack_table(hostname, community, logger)
+    stack = get_if_stack_table(engine, auth, target, logger)
     if stack:
         network['ifStackTable'] = get_inv_stack_table(stack)
     else:
@@ -327,7 +284,7 @@ def discover_host_networking(hostname, community, logger):
     # Return all the stuff we discovered
     return network
 
-def explore_device(hostname, logger=None, community='public'):
+def explore_device(hostname, logger=None, community='public', port=161):
     '''
     Build up a picture of a device via SNMP queries.
     Return the results as a nest of dicts:
@@ -336,19 +293,27 @@ def explore_device(hostname, logger=None, community='public'):
     '''
     # Ensure we have a logger
     if not logger:
-        create_logger()
+        logger = create_logger()
     # Dict to hold the device's information
     device = {}
+    # Create SNMP engine
+    snmpengine = pysnmp.hlapi.SnmpEngine()
+    # Create auth creds
+    snmpauth = pysnmp.hlapi.CommunityData(community, community)
+    # Create transport target object
+    snmptarget = pysnmp.hlapi.UdpTransportTarget((hostname, port))
     # Now get to work
     logger.info('Performing discovery on %s', hostname)
     # Top-level system information
-    sysinfo = identify_host(hostname, community, logger)
+    sysinfo = identify_host(snmpengine, snmpauth, snmptarget, logger)
     if sysinfo:
         device['sysinfo'] = sysinfo
+        logger.debug('Discovered system information:\n%s',
+                     json.dumps(device['sysinfo'], indent=4, sort_keys=True))
     else:
         logger.critical('Failed to gather even basic system information about %s', hostname)
         sys.exit(1)
     # Interfaces
-    device['network'] = discover_host_networking(hostname, community, logger)
+    device['network'] = discover_host_networking(snmpengine, snmpauth, snmptarget, logger)
     # Return the information we found
     return device

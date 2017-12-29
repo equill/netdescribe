@@ -20,11 +20,20 @@ i.e. to the terminal/CLI unless redirected.
 #   limitations under the License.
 
 # Included batteries
+import ipaddress
 import json
 
 # From this package
 from netdescribe.snmp import device_discovery
 from netdescribe.utils import create_logger
+
+class IPInterfaceEncoder(json.JSONEncoder):
+    "Render an ipaddress.IPv4Interface object to a serialisable string"
+    def default(self, obj):
+        if isinstance(obj, (ipaddress.IPv4Interface, ipaddress.IPv6Interface)):
+            return obj.with_prefixlen
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
 
 def snmp_to_json(target, community, filepath, logger=None):
     """
@@ -42,5 +51,5 @@ def snmp_to_json(target, community, filepath, logger=None):
     # Do basic pretty-printing of the output, for human-readability.
     response = device_discovery.explore_device(target, slogger, community=community)
     outfile = open(filepath, "w")
-    json.dump(response, outfile, sort_keys=True, indent=4)
+    json.dump(response, outfile, sort_keys=True, indent=4, cls=IPInterfaceEncoder)
     outfile.close()
