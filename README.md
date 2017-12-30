@@ -54,8 +54,8 @@ RESULT = netdescribe.snmp.device_discovery.exploreDevice(
                             # in units of 1,000,000 bits per second. Zero for subinterfaces
                             # with no concept of bandwidth.
             - ifPhysAddress    # E.g. MAC address for an 802.x interface
-    - ifIfaceAddrMap      # Mapping of addresses to interface indices
-        - interface index (relative to ifTable)
+    - ipIfaceAddrMap      # Mapping of addresses to interface indices
+        - interface index (relative to ifTable, matches <SNMP index> from the `interfaces` section)
             - list of ipaddress objects, of type IPv4Interface or IPv6Interface
     - ifStackTable      # Contents of the ifStackTable SNMP table.
                         # Returned as None if ifStackTable is not implemented on the target,

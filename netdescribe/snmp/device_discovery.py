@@ -246,7 +246,7 @@ def discover_host_networking(engine, auth, target, logger):
                             # in units of 1,000,000 bits per second. Zero for subinterfaces
                             # with no concept of bandwidth.
             - ifPhysAddress    # E.g. MAC address for an 802.x interface
-    - ifIfaceAddrMap      # Mapping of addresses to interface indices
+    - ipIfaceAddrMap      # Mapping of addresses to interface indices
         - interface index (relative to ifTable)
             - list of dicts:
                 - address = IP address for interface
@@ -274,7 +274,7 @@ def discover_host_networking(engine, auth, target, logger):
                  json.dumps(network['interfaces'], indent=4, sort_keys=True))
     # Map addresses to interfaces
     logger.debug('Mapping addresses to interfaces')
-    network['ifIfaceAddrMap'] = get_iface_addr_map(engine, auth, target, logger)
+    network['ipIfaceAddrMap'] = get_iface_addr_map(engine, auth, target, logger)
     # ifStackTable encodes the relationship between subinterfaces and their parents.
     stack = get_if_stack_table(engine, auth, target, logger)
     if stack:
