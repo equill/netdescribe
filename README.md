@@ -37,13 +37,14 @@ RESULT = netdescribe.snmp.device_discovery.exploreDevice(
 - sysinfo
     - sysName       # Usually either the hostname or the host's FQDN.
     - sysDescr      # Detailed text description of the system.
-    - sysObjectID   # Vendor's OID identifying the device.
+                    # On Linux, this is the output of `uname -a`.
+    - sysObjectID   # Vendor's OID identifying the device, which should correspond to make/model.
 - network
     - interfaces
         - <SNMP index>
             - ifName    # Short name of the interface, in contrast to ifDescr
             - ifDescr   # Detailed text description of the interface
-            - ifAlias   # Description string as configured by an administrator for this interface.
+            - ifAlias   # Description string, as configured by an administrator for this interface.
             - ifType    # IANA-specified interface type
             - ifSpeed   # reports the max speed in bits/second.
                         # If a 32-bit gauge is too small to report the speed, this should be
@@ -60,6 +61,17 @@ RESULT = netdescribe.snmp.device_discovery.exploreDevice(
                         # Returned as None if ifStackTable is not implemented on the target,
                         # e.g. on Linux.
 ```
+
+### Interface objects
+
+`IPv4Interface` and `IPv6Interface` are [interface objects](https://docs.python.org/3.5/library/ipaddress.html#interface-objects) from the [ipaddress module](https://docs.python.org/3.5/library/ipaddress.html).
+
+What makes them so useful is the convenient way you can get different representations of them:
+
+- `addr.ip` returns the address by itself, as an `ipaddress.IPv4Address` or `ipaddress.IPv6Address` object
+    - these can be converted to strings, via `str(addr.ip)`
+- `addr.with_prefixlen` returns the CIDR representation of an address, e.g. '192.0.2.5/24'
+- `addr.with_netmask` shows the network portion as a netmask, e.g: '192.0.2.5/255.255.255.0'
 
 
 ## Examples
