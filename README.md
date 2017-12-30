@@ -19,14 +19,14 @@ It's intended to be used as a library that returns a Python data structure, whic
 ```
 #!/usr/bin/env python3
 
-import logging
 import netdescribe.demo
 import netdescribe.snmp.device_discovery
+from netdescribe.utils import create_logger
 
 RESULT = netdescribe.snmp.device_discovery.exploreDevice(
-             "amchitka", netdescribe.demo.create_logger(logging.DEBUG))
+             "amchitka", netdescribe.demo.create_logger(loglevel="debug"))
 
-<now iterate over RESULT>
+<now do stuff with RESULT>
 ```
 
 ## Data structure
