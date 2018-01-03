@@ -170,12 +170,63 @@ def get_inv_stack_table(stack):
 
 def get_iface_addr_map(engine, auth, target, logger):
     '''
-    Extract a mapping of addresses to interfaces.
+    Extract a mapping of addresses to interfaces, derived from the deprecated but still widely-used
+    ipAddrTable.
+    This only returns IPv4 addresses for now.
     Return a dict:
     - interface index in ifTable
         - list of ipaddress interface objects
     '''
-    logger.debug('Extracting a mapping of addresses to interfaces')
+    logger.debug('Extracting a mapping of addresses to interfaces from ipAddressTable')
+    # SNMP returns this to us by address not interface.
+    # Thus, we have to build an address-oriented dict first, then assemble the final result.
+    acc = {}    # Intermediate accumulator for building up a map
+    # acc structure:
+    # - index = SNMP index for ipAddressTable, e.g. ipv4."192.168.124.1"
+    #   - index = SNMP index
+    #   - address = IP address
+    #   - protocol = IP protocol version, i.e. ipv4 or ipv6
+    #   - prefixlength = integer, 0-32
+    #   - type = address type: unicast, multicast or broadcast
+    # Addresses
+    logger.debug('Addresses')
+    for item in snmp_walk(engine, auth, target, 'IP-MIB', 'ipAdEntAddr', logger):
+        logger.debug('Initialising address {} in the accumulator with index {}'.format(
+            item.value, item.oid))
+        acc[item.oid] = {'address': item.value}
+    logger.debug('Indices')
+    for item in snmp_walk(engine, auth, target, 'IP-MIB', 'ipAdEntIfIndex', logger):
+        logger.debug('Augmenting {} with interface index {}'.format(item.value, item.oid))
+        acc[item.oid]['index'] = item.value
+    logger.debug('Netmasks')
+    for item in snmp_walk(engine, auth, target, 'IP-MIB', 'ipAdEntNetMask', logger):
+        logger.debug('Augmenting {} with netmask {}'.format(item.value, item.oid))
+        acc[item.oid]['netmask'] = item.value
+    # Build the return structure
+    result = {}
+    for addr, details in acc.items():
+        logger.debug('Examining address %s for the address map, with details %s', addr, details)
+        # Build the interface object
+        address = ipaddress.IPv4Interface('%s/%s' % (details['address'], details['netmask']))
+        logger.debug('Inferred address %s', address)
+        # Ensure there's a key in the dict for this interface
+        if details['index'] not in result:
+            result[details['index']] = []
+        # Add this address to its interface's address-list
+        result[details['index']].append(address)
+    # Return it
+    logger.debug('Returning interface address map: %s', result)
+    return result
+
+def get_iface_address_map(engine, auth, target, logger):
+    '''
+    Extract a mapping of addresses to interfaces, derived from the ipAddressTable OID.
+    This one is preferred over the deprecated ipAddrTable, but less widely implemented.
+    Return a dict:
+    - interface index in ifTable
+        - list of ipaddress interface objects
+    '''
+    logger.debug('Extracting a mapping of addresses to interfaces from ipAddressTable')
     # SNMP returns this to us by address not interface.
     # Thus, we have to build an address-oriented dict first, then assemble the final result.
     acc = {}    # Intermediate accumulator for building up a map
@@ -222,8 +273,10 @@ def get_iface_addr_map(engine, auth, target, logger):
             address = ipaddress.IPv6Interface('%s/%s' % (details['address'],
                                                          details['prefixlength']))
         logger.debug('Inferred address %s', address)
+        # Ensure there's a key in the dict for this interface
         if details['index'] not in result:
             result[details['index']] = []
+        # Add this address to its interface's address-list
         result[details['index']].append(address)
     # Return it
     logger.debug('Returning interface address map: %s', result)
@@ -274,6 +327,8 @@ def discover_host_networking(engine, auth, target, logger):
                  json.dumps(network['interfaces'], indent=4, sort_keys=True))
     # Map addresses to interfaces
     logger.debug('Mapping addresses to interfaces')
+    # Use the deprecated one for now.
+    # FIXME: add logic to figure out when we can use the non-deprecated one.
     network['ipIfaceAddrMap'] = get_iface_addr_map(engine, auth, target, logger)
     # ifStackTable encodes the relationship between subinterfaces and their parents.
     stack = get_if_stack_table(engine, auth, target, logger)
