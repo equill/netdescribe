@@ -305,9 +305,6 @@ def discover_host_networking(engine, auth, target, logger):
             - list of dicts:
                 - address = IP address for interface
                 - netmask = netmask for interface address
-    # The following entries will be None if ifStackTable is not implemented on the target device.
-    # They're explicitly set this way to make it simpler for client code to test for them.
-    - ifStackTable      # Contents of the ifStackTable SNMP table
     '''
     logger.info('Discovering network details for host %s', target.transportAddr[0])
     network = {'interfaces': {}}
@@ -331,12 +328,13 @@ def discover_host_networking(engine, auth, target, logger):
     # Use the deprecated one for now.
     # FIXME: add logic to figure out when we can use the non-deprecated one.
     network['ipIfaceAddrMap'] = get_iface_addr_map(engine, auth, target, logger)
+    ## Disable until I improve the mapping to usability
     # ifStackTable encodes the relationship between subinterfaces and their parents.
-    stack = get_if_stack_table(engine, auth, target, logger)
-    if stack:
-        network['ifStackTable'] = get_inv_stack_table(stack)
-    else:
-        network['ifStackTable'] = None
+    #stack = get_if_stack_table(engine, auth, target, logger)
+    #if stack:
+    #    network['ifStackTable'] = get_inv_stack_table(stack)
+    #else:
+    #    network['ifStackTable'] = None
     # Return all the stuff we discovered
     return network
 
