@@ -118,7 +118,8 @@ def identify_host(engine, auth, target, logger):
     data = {}
     for attr in ['sysName',
                  'sysDescr',
-                 'sysObjectID']:
+                 'sysObjectID',
+                 'sysLocation']:
         response = snmp_get(engine, auth, target, 'SNMPv2-MIB', attr, logger)
         if response:
             data[attr] = response
