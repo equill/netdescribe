@@ -164,15 +164,3 @@ def basic_demo():
 if __name__ == '__main__':
     basic_demo()
 ```
-
-
-# Compatibility
-
-Known to work with:
-- Juniper
-    - SRX100
-    - SRX550
-- Cisco
-    - 3750
-- Linux
-    - Ubuntu 16.10
