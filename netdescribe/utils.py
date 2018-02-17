@@ -42,11 +42,13 @@ def create_logger(loglevel="info"):
     }
     # Creat the basic object, and set its base loglevel
     logger = logging.getLogger('netdescribe')
-    logger.setLevel(loglevels[loglevel])
-    # Create and configure a console handler, and add it to the logger
-    chandler = logging.StreamHandler(stream=sys.stdout)
-    chandler.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
-    chandler.setLevel(loglevels[loglevel])
-    logger.addHandler(chandler)
+    # Configure the logger only if we haven't already done this
+    if not logger.hasHandlers():
+        logger.setLevel(loglevels[loglevel])
+        # Create and configure a console handler, and add it to the logger
+        chandler = logging.StreamHandler(stream=sys.stdout)
+        chandler.setFormatter(logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s'))
+        chandler.setLevel(loglevels[loglevel])
+        logger.addHandler(chandler)
     # Return the logger we created
     return logger
