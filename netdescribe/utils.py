@@ -19,6 +19,8 @@ General utilities
 #   limitations under the License.
 
 # Included batteries
+import ipaddress
+import json
 import logging
 import sys
 
@@ -52,3 +54,16 @@ def create_logger(loglevel="info"):
         logger.addHandler(chandler)
     # Return the logger we created
     return logger
+
+
+class IPInterfaceEncoder(json.JSONEncoder):
+    """
+    Render an ipaddress.IPv4Interface object to a serialisable string.
+    Enable rendering interface objects in JSON.
+     """
+    def default(self, obj):
+        # Handle instances of IPv4Interface and IPv6Interface
+        if isinstance(obj, (ipaddress.IPv4Interface, ipaddress.IPv6Interface)):
+            return obj.with_prefixlen
+        # Fall back to the base class's default behaviour for anything else
+        return json.JSONEncoder.default(self, obj)

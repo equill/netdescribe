@@ -19,7 +19,6 @@ It's intended to be used as a library that returns a Python data structure, whic
 ```
 #!/usr/bin/env python3
 
-import netdescribe.demo
 import netdescribe.snmp.device_discovery
 from netdescribe.utils import create_logger
 
@@ -31,7 +30,7 @@ RESULT = netdescribe.snmp.device_discovery.exploreDevice(
 
 ## Data structure
 
-`exploreDevice`, the main SNMP discovery function, returns a nest of dicts as follows:
+`exploreDevice`, the main SNMP discovery function, returns an object. Its `as_dict()` method returns a nest of dicts as follows:
 
 ```
 - sysinfo
@@ -61,6 +60,18 @@ RESULT = netdescribe.snmp.device_discovery.exploreDevice(
                         # Returned as None if ifStackTable is not implemented on the target,
                         # e.g. on Linux.
 ```
+
+The `as_json()` method renders this structure in JSON format, handling conversion of `ipaddress.IPv4Interface` and `ipaddress.IPv6Interface` objects to text.
+
+Of course, you can also query its attributes directly. These include:
+
+- `sys_name`
+- `sys_descr`
+- `sys_object_id`
+- `sys_location`
+- `network`
+
+Currently there's only the base class of `Mib2`, representing a generic device conforming closely enough to MIB-II. However, this design is intended to enable the graceful (enough) handling of the multitude of SNMP implementations.
 
 ### Interface objects
 
