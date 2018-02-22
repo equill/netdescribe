@@ -38,27 +38,25 @@ RESULT = netdescribe.snmp.device_discovery.exploreDevice(
     - sysDescr      # Detailed text description of the system.
                     # On Linux, this is the output of `uname -a`.
     - sysObjectID   # Vendor's OID identifying the device, which should correspond to make/model.
-- network
-    - interfaces
-        - <SNMP index>
-            - ifName    # Short name of the interface, in contrast to ifDescr
-            - ifDescr   # Detailed text description of the interface
-            - ifAlias   # Description string, as configured by an administrator for this interface.
-            - ifType    # IANA-specified interface type
-            - ifSpeed   # reports the max speed in bits/second.
-                        # If a 32-bit gauge is too small to report the speed, this should be
-                        # set to the max possible value (4,294,967,295) and ifHighSpeed must
-                        # be used instead.
-            - ifHighSpeed   # ifHighSpeed is an estimate of the interface's current bandwidth
-                            # in units of 1,000,000 bits per second. Zero for subinterfaces
-                            # with no concept of bandwidth.
-            - ifPhysAddress    # E.g. MAC address for an 802.x interface
+    - sysLocation   # Physical location of the device
+- interfaces
+    - <SNMP index>
+        - ifIndex   # Index for this interface in ifTable and ifXTable
+        - ifDescr   # Detailed text description of the interface
+        - ifType    # IANA-specified interface type
+        - ifSpeed   # reports the max speed in bits/second.
+                    # If a 32-bit gauge is too small to report the speed, this should be
+                    # set to the max possible value (4,294,967,295) and ifHighSpeed must
+                    # be used instead.
+        - ifPhysAddress    # E.g. MAC address for an 802.x interface
+        - ifName    # Short name of the interface, in contrast to ifDescr
+        - ifHighSpeed   # ifHighSpeed is an estimate of the interface's current bandwidth
+                        # in units of 1,000,000 bits per second. Zero for subinterfaces
+                        # with no concept of bandwidth.
+        - ifAlias   # Description string, as configured by an administrator for this interface.
     - ipIfaceAddrMap      # Mapping of addresses to interface indices
         - interface index (relative to ifTable, matches <SNMP index> from the `interfaces` section)
             - list of ipaddress objects, of type IPv4Interface or IPv6Interface
-    - ifStackTable      # Contents of the ifStackTable SNMP table.
-                        # Returned as None if ifStackTable is not implemented on the target,
-                        # e.g. on Linux.
 ```
 
 The `as_json()` method renders this structure in JSON format, handling conversion of `ipaddress.IPv4Interface` and `ipaddress.IPv6Interface` objects to text.
