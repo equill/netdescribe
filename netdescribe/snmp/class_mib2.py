@@ -110,11 +110,11 @@ class Mib2:
             return False
         self._ifnumber = ifnumber
         # Now retrieve the interface data
-        interfaces = collections.defaultdict(str)
+        interfaces = {}
         for row in self._if_mib_attrs:
             for item in self.__walk('IF-MIB', row):
                 if item.oid not in interfaces:
-                    interfaces[item.oid] = {}
+                    interfaces[item.oid] = collections.defaultdict(str)
                 interfaces[item.oid][row] = item.value
         # Having retrieved the data, create the list
         interfacelist = []

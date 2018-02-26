@@ -24,7 +24,12 @@ import pysnmp.hlapi
 # From this package
 from netdescribe.utils import create_logger
 from netdescribe.snmp.snmp_functions import snmp_get, snmp_walk
+from netdescribe.snmp.class_brocade import Brocade
+from netdescribe.snmp.class_linux import Linux
 from netdescribe.snmp.class_mib2 import Mib2
+
+# Included modules
+import re
 
 
 # Functions to actually get the data
@@ -91,8 +96,26 @@ def create_device(hostname, logger, community, port):
                          'SNMPv2-MIB',
                          'sysObjectID',
                          logger)
+    logger.debug('sysObjectID: {}'.format(object_id))
     # Create and return the object itself
-    logger.info('sysObjectID for %s is %s. Creating a MIB-2 object',
+    # Brocade
+    if re.match(".*1991.*", object_id):
+        logger.info('Detected Brocade, probably Ironware.')
+        return Brocade(snmptarget, snmpengine, snmpauth, logger, sysObjectID=object_id)
+    # Linux
+    # For other OSes running NetSNMP, see http://www.oidview.com/mibs/8072/NET-SNMP-TC.html
+    if re.match(".*8072.3.2.10", object_id):
+        logger.info('Detected Linux.')
+        return Linux(snmptarget, snmpengine, snmpauth, logger, sysObjectID=object_id)
+    # Junos
+    # For model specifics, see http://www.oidview.com/mibs/2636/JUNIPER-CHASSIS-DEFINES-MIB.html
+    # The Mib2 class works well enough for now, but will need replacing when Juniper-specific
+    # details are needed.
+    if re.match(".*2636.1.1.1.*", object_id):
+        logger.info('Detected Junos.')
+        return Mib2(snmptarget, snmpengine, snmpauth, logger, sysObjectID=object_id)
+    # Fall back to the default
+    logger.info('Unrecognised sysObjectID for %s is %s. Creating a MIB-2 object',
                 hostname, object_id)
     return Mib2(snmptarget, snmpengine, snmpauth, logger, sysObjectID=object_id)
 
