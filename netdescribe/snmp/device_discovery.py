@@ -122,9 +122,8 @@ def create_device(hostname, logger, community, port):
 def explore_device(hostname, logger=None, community='public', port=161):
     '''
     Build up a picture of a device via SNMP queries.
-    Return the results as a nest of dicts:
-    - sysinfo: output of identify_host()
-    - network: output of discover_host_networking()
+    Return the results as an instance of the class that best matches the detected
+    SNMP implementation.
     '''
     # Ensure we have a logger
     if not logger:
