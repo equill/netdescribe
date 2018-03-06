@@ -6,13 +6,15 @@ from setuptools import setup, find_packages
 
 setup(
     name='netdescribe',
-    version='0.2.2',
+    packages=['netdescribe']
+    version='0.2.3',
     description='Scripts for performing discovery on network devices.',
     long_description='Scripts for performing discovery on network devices.',
-    url='https://github.com/equill/netdescribe',
     author='James Fleming',
+    url='https://github.com/equill/netdescribe',
     author_email='james@electronic-quill.net',
-    license='Apachev2',
+    keywords=['network', 'discovery', 'snmp'],
+    install_requires=['pysnmp'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: System Administrators',
@@ -21,9 +23,6 @@ setup(
         'Topic :: System :: Networking :: Monitoring',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-    ],
-    keywords='network discovery snmp',
-    packages=find_packages(),
-    install_requires=['pysnmp'],
+        'Programming Language :: Python :: 3.5'],
+    license='Apachev2'
 )
