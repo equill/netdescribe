@@ -90,13 +90,17 @@ def create_device(hostname, logger, community, port):
     # Create transport target object
     snmptarget = pysnmp.hlapi.UdpTransportTarget((hostname, port))
     # Get the sysObjectId for this device
-    object_id = snmp_get(snmpengine,
-                         snmpauth,
-                         snmptarget,
-                         'SNMPv2-MIB',
-                         'sysObjectID',
-                         logger)
-    logger.debug('sysObjectID: {}'.format(object_id))
+    try:
+        object_id = snmp_get(snmpengine,
+                             snmpauth,
+                             snmptarget,
+                             'SNMPv2-MIB',
+                             'sysObjectID',
+                             logger)
+        logger.debug('sysObjectID: {}'.format(object_id))
+    except RuntimeError as err:
+        logger.error('Error caught: %s', str(err))
+        return False
     # Create and return the object itself
     # Brocade
     if re.match(".*1991.*", object_id):
@@ -122,8 +126,9 @@ def create_device(hostname, logger, community, port):
 def explore_device(hostname, logger=None, community='public', port=161):
     '''
     Build up a picture of a device via SNMP queries.
-    Return the results as an instance of the class that best matches the detected
-    SNMP implementation.
+    Return the results as a nest of dicts:
+    - sysinfo: output of identify_host()
+    - network: output of discover_host_networking()
     '''
     # Ensure we have a logger
     if not logger:
@@ -132,8 +137,14 @@ def explore_device(hostname, logger=None, community='public', port=161):
     logger.info('Performing discovery on %s', hostname)
     # Create an object to represent this device,
     # taking its SNMP capabilities into account
-    device = create_device(hostname, logger, community, port)
-    # Perform discovery as appropriate to this device type
-    device.discover()
-    # Return the device object, complete with its discovered data
-    return device
+    try:
+        device = create_device(hostname, logger, community, port)
+        if device:
+            # Perform discovery as appropriate to this device type
+            device.discover()
+            # Return the device object, complete with its discovered data
+            return device
+        return False
+    except RuntimeError as err:
+        logger.error('Error caught: %s', str(err))
+        return False

@@ -198,9 +198,17 @@ class Mib2:
         '''
         acc = collections.defaultdict(list)
         for address in self._ipaddresses:
+            # When queried for ipAddressPrefix, Brocade Ironware returns an upraised middle finger
+            # in the form of SNMPv2-SMI::zeroDotZero.
+            # Catch and handle this case.
+            if address.prefixlength == 'SNMPv2-SMI::zeroDotZero':
+                prefix = 0
+            else:
+                prefix = address.prefixlength
+            # Now assemple it
             acc[address.ipAddressIfIndex].append({'protocol': address.protocol,
                                                   'address': address.address,
-                                                  'prefixlength': address.prefixlength,
+                                                  'prefixLength': prefix,
                                                   'addressType': address.addressType})
         return acc
 

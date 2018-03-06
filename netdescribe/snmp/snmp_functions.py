@@ -47,9 +47,11 @@ def snmp_get(engine, auth, target, mib, attr, logger):
     returnval = None
     if error_indication:
         logger.error(error_indication)
+        raise RuntimeError(error_indication)
     elif error_status:
         logger.error('%s at %s' % (error_status.prettyPrint(),
                                    error_index and var_binds[int(error_index) - 1][0] or '?'))
+        raise RuntimeError(error_status.prettyPrint())
     # If we actually got something, return it as an SnmpDatum
     else:
         returnval = var_binds[0][1].prettyPrint()

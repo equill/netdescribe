@@ -2,11 +2,11 @@
 
 "Create the package"
 
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name='netdescribe',
-    packages=['netdescribe']
+    packages=['netdescribe'],
     version='0.2.3',
     description='Scripts for performing discovery on network devices.',
     long_description='Scripts for performing discovery on network devices.',
