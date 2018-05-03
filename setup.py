@@ -6,8 +6,8 @@ from setuptools import setup
 
 setup(
     name='netdescribe',
-    packages=['netdescribe'],
-    version='0.2.3',
+    version='0.2.4',
+    packages=['netdescribe', 'netdescribe.snmp'],
     description='Scripts for performing discovery on network devices.',
     long_description='Scripts for performing discovery on network devices.',
     author='James Fleming',
