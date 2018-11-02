@@ -54,3 +54,27 @@ IpAddr = namedtuple('ipAddr', [
     'ipAdEntAddr',      # The actual IP address
     'ipAdEntNetMask'    # The address' netmask
     ])
+
+# BGP4 instance-wide details
+# On systems with multiple BGP instances, this describes (only) the BGP instance being queried,
+# so each one will need to be queried separately.
+BgpInstance = namedtuple('bgpinstance', [
+    'bgpLocalAs',
+    'bgpIdentifier'
+    ])
+
+# Describes entries in BGP4-MIB::bgpPeerTable as a subset of bgpPeerEntry
+BgpPeerEntry = namedtuple('bgppeerentry', [
+    'bgpPeerIdentifier',
+    'bgpPeerHoldTime',
+    'bgpPeerKeepAlive',
+    'bgpPeerState',
+    'bgpPeerHoldTimeConfigured',
+    'bgpPeerKeepAliveConfigured',
+    'bgpPeerAdminStatus',
+    'bgpPeerLocalAddr',
+    'bgpPeerLocalPort',
+    'bgpPeerRemoteAddr',
+    'bgpPeerRemotePort',
+    'bgpPeerRemoteAs'
+    ])
