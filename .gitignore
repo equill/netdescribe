@@ -1,4 +1,5 @@
 *.pyc
+build/
 dist/
 netdescribe.egg-info/
 venv*/
