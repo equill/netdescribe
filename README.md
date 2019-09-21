@@ -8,7 +8,7 @@ Currently supports SNMP only, though Netconf/OpenConfig support are intended for
 
 Distributed under the Apache 2.0 license. Use it as you will, but constructive feedback and well-formatted pull-requests are welcome.
 
-Developed and tested on Ubuntu Linux; bug reports about misbehaviour on other platforms are welcome.
+Developed and tested on Python37 on Nixos (Linux); bug reports about misbehaviour on other platforms are welcome.
 
 
 # Usage
@@ -173,3 +173,12 @@ def basic_demo():
 if __name__ == '__main__':
     basic_demo()
 ```
+
+# Installation
+
+If you're running Nixos, first run `nix-shell` in this directory.
+If you're running anything else, ensure you have Python3.7 and pip installed.
+
+## Nixos
+
+Note that you need to execute `unset SOURCE_DATE_EPOCH` in the shell before running `pip install -r requirements.txt`, to prevent Zip failing with a timestamp error when building wheels. See [the Nixos docs for python-setup](https://nixos.org/nixpkgs/manual/#python-setup.py-bdist_wheel-cannot-create-.whl) for details.
