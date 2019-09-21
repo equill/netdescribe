@@ -21,6 +21,7 @@ Generic SNMP MIB-II object
 # Local modules
 from netdescribe.snmp.snmp_functions import snmp_get, snmp_walk
 from netdescribe.snmp.snmp_structures import Interface, IpAddr, IpAddress, SystemData
+from netdescribe.snmp.snmp_structures import BgpInstance, BgpPeerEntry
 import netdescribe.utils
 
 # Built-in modules
@@ -57,16 +58,41 @@ class Mib2:
         self._interfaces = None  # List of Interface namedtuples
         self._ipaddrs = None # List of IpAddr namedtuples
         self._ipaddresses = None # List of IpAddress namedtuples
+        self._bgp4 = None # Hash-table:
+        # key = instance-name (default is "default")
+        # value = hash:
+        # - 'instance' = BgpInstance namedtuple
+        # - 'peers' = list of BgpPeerEntry namedtuples
         # Protected attribute, to capture it if it's supplied
         self._sys_object_id = sysObjectID
 
-    def __get(self, attribute, mib='SNMPv2-MIB'):
+    def __get(self, attribute, mib='SNMPv2-MIB', auth=None, target=None):
         'Convenience function for performing SNMP GET'
-        return snmp_get(self.engine, self.auth, self.target, mib, attribute, self.logger)
+        # Figure out the optional parameters
+        if auth:
+            authz = auth
+        else:
+            authz = self.auth
+        if target:
+            targetz = target
+        else:
+            targetz = self.target
+        # Now fetch the data
+        return snmp_get(self.engine, authz, targetz, mib, attribute, self.logger)
 
-    def __walk(self, table, row):
+    def __walk(self, table, row, auth=None, target=None):
         'Convenience function for performing SNMP WALK'
-        return snmp_walk(self.engine, self.auth, self.target, table, row, self.logger)
+        # Figure out the optional parameters
+        if auth:
+            authz = auth
+        else:
+            authz = self.auth
+        if target:
+            targetz = target
+        else:
+            targetz = self.target
+        # Now fetch the data
+        return snmp_walk(self.engine, authz, targetz, table, row, self.logger)
 
     def identify(self):
         '''
@@ -320,6 +346,86 @@ class Mib2:
                                     'ifAlias': iface.ifAlias,
                                     'addresses': addresslist[iface.ifIndex]}
         return result
+
+    def bgp4_instance(self, auth=None, target=None):
+        '''
+        Return a hash-table of BGP4 data for the named BGP4 instance on the target.
+        Arguments, both optional for overriding the default:
+        - auth = community-string. These tend to vary with multiple instances.
+        - target = target address. This can be different for querying difference instances.
+        '''
+        # Figure out the optional parameters
+        if auth:
+            authz = auth
+        else:
+            authz = self.auth
+        if target:
+            targetz = target
+        else:
+            targetz = self.target
+        # Assemble and return the results
+        return {'instance': self.bgp4_system(auth=authz, target=targetz),
+                'peers': self.bgp4_peerings(auth=authz, target=targetz)}
+
+    def bgp4_system(self, auth=None, target=None):
+        '''
+        Return instance-wide details for BGP4:
+        - local ASN
+        - local identifier (router ID)
+        Assumes a single BGP instance on the target host.
+        '''
+        # Figure out the optional parameters
+        if auth:
+            authz = auth
+        else:
+            authz = self.auth
+        if target:
+            targetz = target
+        else:
+            targetz = self.target
+        # Assemble and return the results
+        return BgpInstance(bgpLocalAs=self.__get('localAs',
+                                                 mib='BGP4-MIB',
+                                                 auth=authz,
+                                                 target=targetz),
+                           bgpIdentifier=self.__get('localIdentifier',
+                                                    mib='BGP4-MIB',
+                                                    auth=authz,
+                                                    target=targetz))
+
+    def bgp4_peerings(self, auth=None, target=None):
+        '''
+        Return a list of peering objects, derived from bgpPeerTable.
+        Assumes a single BGP instance on the target host.
+        '''
+        # Figure out the optional parameters
+        if auth:
+            authz = auth
+        else:
+            authz = self.auth
+        if target:
+            targetz = target
+        else:
+            targetz = self.target
+        result = collections.defaultdict(dict) # Result accumulator
+        for row in ['bgpPeerIdentifier',
+                    'bgpPeerHoldTime']:
+            for peer in self.__walk("BGP4-MIB", row, auth=authz, target=targetz):
+                result[peer.oid][row] = peer.value
+        return [BgpPeerEntry(bgpPeerIdentifier=result[peer]['bgpPeerIdentifier'],
+                            bgpPeerHoldTime=result[peer]['bgpPeerHoldTime'],
+                            bgpPeerKeepAlive=result[peer]['bgpPeerKeepAlive'],
+                            bgpPeerState=result[peer]['bgpPeerState'],
+                            bgpPeerHoldTimeConfigured=result[peer]['bgpPeerHoldTimeConfigured'],
+                            bgpPeerKeepAliveConfigured=result[peer]['bgpPeerKeepAliveConfigured'],
+                            bgpPeerAdminStatus=result[peer]['bgpPeerAdminStatus'],
+                            bgpPeerLocalAddr=result[peer]['bgpPeerLocalAddr'],
+                            bgpPeerLocalPort=result[peer]['bgpPeerLocalPort'],
+                            bgpPeerRemoteAddr=result[peer]['bgpPeerRemoteAddr'],
+                            bgpPeerRemotePort=result[peer]['bgpPeerRemotePort'],
+                            bgpPeerRemoteAs=result[peer]['bgpPeerRemoteAs'],
+                            )
+               for peer in result.keys()]
 
     def as_dict(self):
         'Return the object´s contents as a dict'
