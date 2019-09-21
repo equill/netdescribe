@@ -18,6 +18,8 @@
 Generic SNMP MIB-II object
 """
 
+# pylint: disable=wrong-import-order
+
 # Local modules
 from netdescribe.snmp.snmp_functions import snmp_get, snmp_walk
 from netdescribe.snmp.snmp_structures import Interface, IpAddr, IpAddress, SystemData
@@ -30,9 +32,13 @@ import ipaddress
 import json
 import re
 
+# Sorry, pylint, but it's just this complex
+# pylint: disable=too-many-instance-attributes
 class Mib2:
     "Generic device conforming to SNMP MIB-II"
 
+    # It just has that many attributes to track. Cope.
+    # pylint: disable=too-many-arguments
     def __init__(self, target, engine, auth, logger, sysObjectID=None):
         # SNMP and overhead parameters
         self.target = target
@@ -185,6 +191,7 @@ class Mib2:
         #   separated by a dot.
         #   The address is wrapped in quotes, hence the offset indices at each end.
         for item in self.__walk('IP-MIB', 'ipAddressIfIndex'):
+            # pylint: disable=anomalous-backslash-in-string
             protocol = re.split('\.', item.oid)[0]
             acc[item.oid] = {'ipAddressIfIndex': item.value,
                              # Extract the address and protocol from the OID/index
@@ -196,6 +203,7 @@ class Mib2:
         # The value for this OID contains all sorts of crap prepended to the actual prefix-length,
         # so we have to break it up and extract the last element from the resulting list.
         for item in self.__walk('IP-MIB', 'ipAddressPrefix'):
+            # pylint: disable=anomalous-backslash-in-string
             prefixlength = re.split('\.', item.value)[-1]
             acc[item.oid]['prefixlength'] = prefixlength
             self.logger.debug('Accumulated prefixlength %s for address %s',
@@ -413,19 +421,19 @@ class Mib2:
             for peer in self.__walk("BGP4-MIB", row, auth=authz, target=targetz):
                 result[peer.oid][row] = peer.value
         return [BgpPeerEntry(bgpPeerIdentifier=result[peer]['bgpPeerIdentifier'],
-                            bgpPeerHoldTime=result[peer]['bgpPeerHoldTime'],
-                            bgpPeerKeepAlive=result[peer]['bgpPeerKeepAlive'],
-                            bgpPeerState=result[peer]['bgpPeerState'],
-                            bgpPeerHoldTimeConfigured=result[peer]['bgpPeerHoldTimeConfigured'],
-                            bgpPeerKeepAliveConfigured=result[peer]['bgpPeerKeepAliveConfigured'],
-                            bgpPeerAdminStatus=result[peer]['bgpPeerAdminStatus'],
-                            bgpPeerLocalAddr=result[peer]['bgpPeerLocalAddr'],
-                            bgpPeerLocalPort=result[peer]['bgpPeerLocalPort'],
-                            bgpPeerRemoteAddr=result[peer]['bgpPeerRemoteAddr'],
-                            bgpPeerRemotePort=result[peer]['bgpPeerRemotePort'],
-                            bgpPeerRemoteAs=result[peer]['bgpPeerRemoteAs'],
-                            )
-               for peer in result.keys()]
+                             bgpPeerHoldTime=result[peer]['bgpPeerHoldTime'],
+                             bgpPeerKeepAlive=result[peer]['bgpPeerKeepAlive'],
+                             bgpPeerState=result[peer]['bgpPeerState'],
+                             bgpPeerHoldTimeConfigured=result[peer]['bgpPeerHoldTimeConfigured'],
+                             bgpPeerKeepAliveConfigured=result[peer]['bgpPeerKeepAliveConfigured'],
+                             bgpPeerAdminStatus=result[peer]['bgpPeerAdminStatus'],
+                             bgpPeerLocalAddr=result[peer]['bgpPeerLocalAddr'],
+                             bgpPeerLocalPort=result[peer]['bgpPeerLocalPort'],
+                             bgpPeerRemoteAddr=result[peer]['bgpPeerRemoteAddr'],
+                             bgpPeerRemotePort=result[peer]['bgpPeerRemotePort'],
+                             bgpPeerRemoteAs=result[peer]['bgpPeerRemoteAs'],
+                             )
+                for peer in result.keys()]
 
     def as_dict(self):
         'Return the object´s contents as a dict'

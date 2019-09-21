@@ -60,7 +60,7 @@ class IPInterfaceEncoder(json.JSONEncoder):
     """
     Render an ipaddress.IPv4Interface object to a serialisable string.
     Enable rendering interface objects in JSON.
-     """
+    """
     def default(self, obj):
         # Handle instances of IPv4Interface and IPv6Interface
         if isinstance(obj, (ipaddress.IPv4Interface, ipaddress.IPv6Interface)):

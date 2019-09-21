@@ -18,6 +18,8 @@
 Perform discovery on an individual host, using SNMP version 2c
 """
 
+# pylint: disable=wrong-import-order
+
 # Third-party libraries
 import pysnmp.hlapi
 

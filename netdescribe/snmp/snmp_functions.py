@@ -18,6 +18,8 @@
 General SNMP functions
 """
 
+# pylint: disable=wrong-import-order
+
 # Third-party libraries
 import pysnmp.hlapi
 
@@ -32,6 +34,7 @@ SnmpDatum = namedtuple('snmpDatum', ['oid', 'value'])
 
 # Basic functions
 
+# pylint: disable=too-many-arguments
 def snmp_get(engine, auth, target, mib, attr, logger):
     '''
     Perform an SNMP GET for a single OID or scalar attribute.
@@ -57,6 +60,8 @@ def snmp_get(engine, auth, target, mib, attr, logger):
         returnval = var_binds[0][1].prettyPrint()
     return returnval
 
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-locals
 def snmp_walk(engine, auth, target, mib, attr, logger):
     '''
     Walk an SNMP OID.
@@ -87,6 +92,7 @@ def snmp_walk(engine, auth, target, mib, attr, logger):
                 # Extract the index values.
                 # We're breaking down 'IF-MIB::ifType.530' into (row='ifType', index='530').
                 # This relies on 'lookupMib=True', to translate numeric OIDs into textual ones.
+                # pylint: disable=anomalous-backslash-in-string
                 keys = re.split('\.', re.split('::', var[0].prettyPrint())[1], maxsplit=1)
                 #row = keys[0]
                 index = keys[1]

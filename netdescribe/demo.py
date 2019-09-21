@@ -21,6 +21,8 @@ depending on whether the --file parameter is supplied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+# pylint: disable=wrong-import-order
+
 # From this package
 import netdescribe.files
 import netdescribe.stdout
