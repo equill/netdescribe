@@ -87,98 +87,35 @@ What makes them so useful is the convenient way you can get different representa
 
 ### demo.py
 
-`demo.py` is included in the source code; it will perform discovery on a device, and send JSON-formatted output to either standard out or a file, depending on whether you specify a file. It defaults to using `public` for the SNMP community string.
-
-You'll find it under the `netdescribe` subdirectory.
+`demo.py` is included in the source code, under the `netdescribe` subdirectory.
+It will perform discovery on a device, and send JSON-formatted output to either standard out or a file, depending on whether you specify a file. It defaults to querying localhost, and using `public` for the SNMP community string.
 
 Usage:
-`./demo.py <hostname> [--community <SNMP community>] [--file </path/to/output/file.json>]`
+`./demo.py [--hostname <hostname>] [--community <SNMP community>] [--file </path/to/output/file.json>]`
 
+
+In case you don't already have a running `snmpd` instance, there's also a basic config file in that directory as well. It listens on all IPv4 addresses, and accepts the community string "public". To use it, install `net_snmp` and run `sudo snmpd -c snmpd.conf -f` in a terminal window.
+
+
+# Building
+
+## Dependencies
+
+Currently, `pysnmp` is the only Python library depended on. Version 4.4.11 is currently used for development and testing.
+
+To do it the systematic way, ensure you have Python3.7, `pip` and `virtualenv` installed; if you're running Nixos, just run `nix-shell` in this directory. Then set up virtualenv and install the dependencies via `pip`:
 ```
-#!/usr/bin/env python3
-
-"""
-Example usage of the Netdescribe library.
-Performs discovery, and sends JSON-formatted output to either standard out or a file,
-depending on whether the --file parameter is supplied.
-"""
-
-
-#   Copyright [2017] [James Fleming <james@electronic-quill.net]
-#
-#   Licensed under the Apache License, Version 2.0 (the "License");
-#   you may not use this file except in compliance with the License.
-#   You may obtain a copy of the License at
-#
-#       http://www.apache.org/licenses/LICENSE-2.0
-#
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-
-# From this package
-import netdescribe.files
-import netdescribe.stdout
-from netdescribe.utils import create_logger
-
-# Included batteries
-import argparse
-
-
-def basic_demo():
-    """
-    Enable this to be run as a CLI script, as well as used as a library.
-    Mostly intended for testing or a basic demo.
-    """
-    # Get the command-line arguments
-    parser = argparse.ArgumentParser(description='Perform SNMP discovery on a host, \
-    returning its data in a single structure.')
-    parser.add_argument('hostname',
-                        type=str,
-                        help='The hostname or address to perform discovery on')
-    parser.add_argument('--community',
-                        type=str,
-                        action='store',
-                        dest='community',
-                        default='public',
-                        help='SNMP v2 community string')
-    parser.add_argument('--file',
-                        type=str,
-                        action='store',
-                        dest='filepath',
-                        default=None,
-                        help='Filepath to write the results to. If this is not specified, \
-                        STDOUT will be used.')
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    args = parser.parse_args()
-    # Set debug logging, if requested
-    if args.debug:
-        logger = create_logger(loglevel="debug")
-    # Normal logging if we're writing to a file
-    elif args.filepath:
-        logger = create_logger()
-    # Suppress INFO output if we're returning it to STDOUT:
-    # don't require the user to filter the output to make it useful.
-    else:
-        logger = create_logger(loglevel="warning")
-    # Perform SNMP discovery on a device,
-    # sending the result to STDOUT or a file, depending on what the user told us.
-    if args.filepath:
-        netdescribe.files.snmp_to_json(args.hostname, args.community, args.filepath, logger)
-    else:
-        netdescribe.stdout.snmp_to_json(args.hostname, args.community, logger)
-
-if __name__ == '__main__':
-    basic_demo()
+virtualenv -p python3.7 venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-# Installation
 
-If you're running Nixos, first run `nix-shell` in this directory.
-If you're running anything else, ensure you have Python3.7 and pip installed.
+## Build process
 
-## Nixos
+`./setup.py build` will produce a pip-installable tarball in the `dist` subdirectory.
+
+
+## Nixos notes
 
 Note that you need to execute `unset SOURCE_DATE_EPOCH` in the shell before running `pip install -r requirements.txt`, to prevent Zip failing with a timestamp error when building wheels. See [the Nixos docs for python-setup](https://nixos.org/nixpkgs/manual/#python-setup.py-bdist_wheel-cannot-create-.whl) for details.
