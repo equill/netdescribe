@@ -40,22 +40,23 @@ def basic_demo():
     # Get the command-line arguments
     parser = argparse.ArgumentParser(description='Perform SNMP discovery on a host, \
     returning its data in a single structure.')
-    parser.add_argument('hostname',
+    parser.add_argument('--hostname',
                         type=str,
-                        help='The hostname or address to perform discovery on')
+                        action='store',
+                        default='localhost',
+                        help='The hostname or address to perform discovery on. Default: localhost')
     parser.add_argument('--community',
                         type=str,
                         action='store',
                         dest='community',
                         default='public',
-                        help='SNMP v2 community string')
+                        help='SNMP v2 community string. Default: public')
     parser.add_argument('--file',
                         type=str,
                         action='store',
                         dest='filepath',
                         default=None,
-                        help='Filepath to write the results to. If this is not specified, \
-                        STDOUT will be used.')
+                        help='Filepath to write the results to. Default: STDOUT.')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = parser.parse_args()
     # Set debug logging, if requested
