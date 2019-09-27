@@ -35,6 +35,7 @@ class Brocade(class_mib2.Mib2):
             'ifSpeed',
             'ifPhysAddress',
             # ifXTable OIDs
+            'ifAlias',
             'ifName',
             'ifHighSpeed']
 
